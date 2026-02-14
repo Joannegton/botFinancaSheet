@@ -544,19 +544,85 @@ export class TelegramBotService implements OnModuleInit {
 
   private async enviarRelatorio(ctx: Context): Promise<void> {
     try {
-      const gastos = await this.registrarGasto.buscarTodos();
+      const userId = ctx.from?.id;
+      if (!userId) {
+        ctx.reply('❌ Erro: usuário não identificado');
+        return;
+      }
 
-      if (gastos.length === 0) {
+      const diaInicio = await this.gerenciarConfig.obterDiaInicio(userId);
+      const todosGastos = await this.registrarGasto.buscarTodos();
+
+      if (todosGastos.length === 0) {
         ctx.reply('📊 Nenhum gasto registrado ainda.');
         return;
       }
 
-      const total = gastos.reduce((acc, g) => acc + g.valor.toNumber(), 0);
-      const ultimosDez = gastos.slice(-10).reverse();
+      // Calcular período baseado na configuração
+      const hoje = new Date();
+      let dataInicio: Date;
+      let dataFim: Date;
+      let periodo: string;
+
+      if (diaInicio !== null) {
+        // Com dia configurado: calcular período mensal
+        const anoAtual = hoje.getFullYear();
+        const mesAtual = hoje.getMonth();
+        const diaAtual = hoje.getDate();
+
+        if (diaAtual >= diaInicio) {
+          dataInicio = new Date(anoAtual, mesAtual, diaInicio);
+          dataFim = new Date(anoAtual, mesAtual + 1, diaInicio);
+        } else {
+          dataInicio = new Date(anoAtual, mesAtual - 1, diaInicio);
+          dataFim = new Date(anoAtual, mesAtual, diaInicio);
+        }
+
+        const mesInicioDisplay = String(dataInicio.getMonth() + 1).padStart(2, '0');
+        const mesFimDisplay = String(dataFim.getMonth() + 1).padStart(2, '0');
+        const diaInicioDisplay = String(diaInicio).padStart(2, '0');
+
+        periodo = `${diaInicioDisplay}/${mesInicioDisplay} até ${diaInicioDisplay}/${mesFimDisplay}`;
+      } else {
+        // Sem dia configurado: usar últimos 30 dias
+        dataFim = new Date(hoje);
+        dataInicio = new Date(hoje);
+        dataInicio.setDate(dataInicio.getDate() - 30);
+
+        const dataInicioFormatada =
+          String(dataInicio.getDate()).padStart(2, '0') +
+          '/' +
+          String(dataInicio.getMonth() + 1).padStart(2, '0') +
+          '/' +
+          dataInicio.getFullYear();
+        const dataFimFormatada =
+          String(dataFim.getDate()).padStart(2, '0') +
+          '/' +
+          String(dataFim.getMonth() + 1).padStart(2, '0') +
+          '/' +
+          dataFim.getFullYear();
+
+        periodo = `últimos 30 dias (${dataInicioFormatada} até ${dataFimFormatada})`;
+      }
+
+      // Filtrar gastos do período
+      const gastosPeriodo = todosGastos.filter((g) => {
+        const dataGasto = g.dataHora;
+        return dataGasto >= dataInicio && dataGasto < dataFim;
+      });
+
+      if (gastosPeriodo.length === 0) {
+        ctx.reply(`📊 Nenhum gasto registrado no período (${periodo}).`);
+        return;
+      }
+
+      const total = gastosPeriodo.reduce((acc, g) => acc + g.valor.toNumber(), 0);
+      const ultimosDez = gastosPeriodo.slice(-10).reverse();
 
       let mensagem = `📊 *Relatório de Gastos*\n\n`;
       mensagem += `💰 Total geral: R$ ${total.toFixed(2)}\n`;
-      mensagem += `📝 Total de registros: ${gastos.length}\n\n`;
+      mensagem += `📝 Total de registros: ${gastosPeriodo.length}\n`;
+      mensagem += `📅 Período: ${periodo}\n\n`;
       mensagem += `*Últimos 10 gastos:*\n\n`;
 
       ultimosDez.forEach((g, index) => {
