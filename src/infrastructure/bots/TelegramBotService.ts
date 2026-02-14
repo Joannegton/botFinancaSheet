@@ -4,6 +4,7 @@ import { Telegraf, Context, Markup } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { MessageParser } from '@application/parsers/MessageParser';
 import { RegistrarGasto } from '@application/use-cases/RegistrarGasto';
+import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
 import { FormaPagamento } from '@domain/value-objects/FormaPagamento';
 import { TipoGasto } from '@domain/value-objects/TipoGasto';
 import { Valor } from '@domain/value-objects/Valor';
@@ -28,6 +29,7 @@ export class TelegramBotService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly messageParser: MessageParser,
     private readonly registrarGasto: RegistrarGasto,
+    private readonly gerenciarCategorias: GerenciarCategorias,
   ) {}
 
   async onModuleInit() {
@@ -85,6 +87,14 @@ export class TelegramBotService implements OnModuleInit {
       this.logger.log('📡 Aguardando mensagens em modo polling...');
     }
 
+    // Inicializar categorias padrão se necessário
+    try {
+      await this.gerenciarCategorias.inicializarCategoriasIfNeeded();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.warn(`⚠️ Erro ao inicializar categorias: ${msg}`);
+    }
+
     // Enviar mensagem de boas-vindas ao iniciar
     if (this.authorizedUserId) {
       this.bot.telegram
@@ -121,7 +131,9 @@ export class TelegramBotService implements OnModuleInit {
   }
 
   private setupCommands(): void {
-    this.logger.log('📝 Registrando comandos: /start, /ajuda, /menu, /cancelar, /relatorio');
+    this.logger.log(
+      '📝 Registrando comandos: /start, /ajuda, /menu, /cancelar, /relatorio, /categorias, /addcategoria',
+    );
 
     this.bot.command('start', (ctx) => {
       ctx.reply(this.getWelcomeMessage(), { parse_mode: 'Markdown' });
@@ -131,8 +143,8 @@ export class TelegramBotService implements OnModuleInit {
       ctx.reply(this.messageParser.getHelpMessage(), { parse_mode: 'Markdown' });
     });
 
-    this.bot.command('menu', (ctx) => {
-      this.startInteractiveFlow(ctx);
+    this.bot.command('menu', async (ctx) => {
+      await this.startInteractiveFlow(ctx);
     });
 
     this.bot.command('cancelar', (ctx) => {
@@ -148,6 +160,14 @@ export class TelegramBotService implements OnModuleInit {
 
     this.bot.command('relatorio', async (ctx) => {
       await this.enviarRelatorio(ctx);
+    });
+
+    this.bot.command('categorias', async (ctx) => {
+      await this.listarCategorias(ctx);
+    });
+
+    this.bot.command('addcategoria', async (ctx) => {
+      await this.adicionarCategoria(ctx);
     });
   }
 
@@ -180,7 +200,7 @@ export class TelegramBotService implements OnModuleInit {
     });
   }
 
-  private startInteractiveFlow(ctx: Context): void {
+  private async startInteractiveFlow(ctx: Context): Promise<void> {
     const userId = ctx.from?.id;
 
     if (!userId) {
@@ -225,23 +245,27 @@ export class TelegramBotService implements OnModuleInit {
           session.step = 'aguardando_tipo';
           // this.sessions.set(userId, session);
 
-          const tipos = TipoGasto.getTiposValidos().join(' | ');
-          ctx.reply(`📝 *Escolha o tipo de gasto:*\n\n${tipos}`, {
+          const categorias = await this.gerenciarCategorias.buscarTodas();
+          const linhas = [];
+          for (let i = 0; i < categorias.length; i += 2) {
+            const botoes = [];
+            botoes.push(categorias[i]);
+            if (i + 1 < categorias.length) {
+              botoes.push(categorias[i + 1]);
+            }
+            linhas.push(botoes);
+          }
+          linhas.push(['❌ Cancelar']);
+
+          const listaCategoriasFormatada = categorias.join(', ');
+          ctx.reply(`📝 *Escolha o tipo de gasto:*\n\n${listaCategoriasFormatada}`, {
             parse_mode: 'Markdown',
-            ...Markup.keyboard([
-              ['🍔 Comida', '🚗 Transporte'],
-              ['🎮 Lazer', '🏥 Saúde'],
-              ['📚 Educação', '🏠 Moradia'],
-              ['👕 Vestuário', '📦 Outros'],
-              ['❌ Cancelar'],
-            ])
-              .resize()
-              .oneTime(),
+            ...Markup.keyboard(linhas).resize().oneTime(),
           });
           break;
 
         case 'aguardando_tipo':
-          const tipo = this.extractTipo(mensagem);
+          const tipo = await this.extractTipo(mensagem);
           session.tipo = tipo;
           session.step = 'aguardando_observacao';
           // this.sessions.set(userId, session);
@@ -255,7 +279,7 @@ export class TelegramBotService implements OnModuleInit {
           break;
 
         case 'aguardando_observacao':
-          const observacao = mensagem.toLowerCase() === 'pular' ? undefined : mensagem;
+          const observacao = mensagem.toLowerCase().includes('pular') ? undefined : mensagem;
 
           const gasto = new Gasto(
             new Date(),
@@ -351,6 +375,51 @@ export class TelegramBotService implements OnModuleInit {
     }
   }
 
+  private async listarCategorias(ctx: Context): Promise<void> {
+    try {
+      const categorias = await this.gerenciarCategorias.buscarTodas();
+
+      if (categorias.length === 0) {
+        ctx.reply('📂 Nenhuma categoria registrada ainda. Use /addcategoria para adicionar.');
+        return;
+      }
+
+      const listaFormatada = await this.gerenciarCategorias.formatarListaCategorias(categorias);
+      const mensagem = `📂 *Categorias disponíveis:*\n\n${listaFormatada}\n\nUse /addcategoria [nome] para adicionar uma nova.`;
+      ctx.reply(mensagem, { parse_mode: 'Markdown' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao listar categorias:', error);
+      ctx.reply(`❌ Erro ao listar categorias: ${msg}`);
+    }
+  }
+
+  private async adicionarCategoria(ctx: Context): Promise<void> {
+    try {
+      const message = ctx.message;
+      if (!message || !('text' in message)) {
+        ctx.reply('❌ Erro ao processar mensagem');
+        return;
+      }
+
+      const args = message.text?.replace('/addcategoria', '').trim() || '';
+
+      if (!args) {
+        ctx.reply(
+          '❌ Use /addcategoria [nome]\n\nExemplo: /addcategoria saude\n\nA categoria não pode ter mais de 20 caracteres.',
+        );
+        return;
+      }
+
+      const novaCategoria = await this.gerenciarCategorias.adicionarCategoria(args);
+      ctx.reply(`✅ Categoria "${novaCategoria}" adicionada com sucesso!`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao adicionar categoria:', error);
+      ctx.reply(`❌ ${msg}`);
+    }
+  }
+
   private extractFormaPagamento(mensagem: string): string {
     const lower = mensagem.toLowerCase();
     if (lower.includes('cartao') || lower.includes('cartão')) return 'cartao';
@@ -359,27 +428,18 @@ export class TelegramBotService implements OnModuleInit {
     throw new Error('Forma de pagamento não reconhecida');
   }
 
-  private extractTipo(mensagem: string): string {
-    const lower = mensagem.toLowerCase();
-    const mapa: Record<string, string> = {
-      comida: 'comida',
-      transporte: 'transporte',
-      lazer: 'lazer',
-      saude: 'saude',
-      saúde: 'saude',
-      educacao: 'educacao',
-      educação: 'educacao',
-      moradia: 'moradia',
-      vestuario: 'vestuario',
-      vestuário: 'vestuario',
-      outros: 'outros',
-    };
+  private async extractTipo(mensagem: string): Promise<string> {
+    const lower = mensagem.toLowerCase().trim();
+    const categorias = await this.gerenciarCategorias.buscarTodas();
 
-    for (const [key, value] of Object.entries(mapa)) {
-      if (lower.includes(key)) return value;
+    // Procura correspondência exata ou parcial
+    for (const categoria of categorias) {
+      if (lower === categoria || lower.includes(categoria)) {
+        return categoria;
+      }
     }
 
-    throw new Error('Tipo de gasto não reconhecido');
+    throw new Error('Tipo de gasto não reconhecido. Use /categorias para ver as disponíveis.');
   }
 
   private getWelcomeMessage(): string {
@@ -390,7 +450,12 @@ export class TelegramBotService implements OnModuleInit {
       `\`cartao, 35, comida, almoço\`\n\n` +
       `2️⃣ *Menu interativo:*\n` +
       `Digite /menu\n\n` +
-      `Digite /ajuda para ver todos os comandos.`
+      `📂 *Gerenciar categorias:*\n` +
+      `/categorias - Ver todas as categorias\n` +
+      `/addcategoria [nome] - Adicionar nova categoria\n\n` +
+      `📝 *Mais comandos:*\n` +
+      `/ajuda - Ver guia completo\n` +
+      `/relatorio - Ver últimos gastos`
     );
   }
 }
