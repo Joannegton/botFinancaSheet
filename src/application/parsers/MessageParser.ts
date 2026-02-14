@@ -127,6 +127,7 @@ export class MessageParser {
       `Digite /criar\n\n` +
       `📝 *Conheça o funcionamento:*\n` +
       `/ajuda - Ver ajuda completa e todas as funcionalidades\n` +
+      `/documentacao - Acessar documentação web completa\n` +
       `${configText}`
     );
   }
@@ -170,6 +171,7 @@ ${categoriasFormatadas}
 📊 *Comandos de consulta:*
 /menu - Inicio
 /ajuda - Ver este guia completo
+/documentacao - Acessar documentação web completa
 /relatorio - Ver últimos gastos
 
 📂 *Gerenciar categorias:*
@@ -184,5 +186,19 @@ ${categoriasFormatadas}
 
 ️⚙ *Configuração:*
 /config - Configurar dados`.trim();
+  }
+  //TODO ajustar link da documentacao em producao
+  async getDocumentacaoMessage(): Promise<string> {
+    return `📚 *Documentação Completa*
+
+Acesse a documentação completa do sistema através dos links abaixo:
+
+🌐 *Documentação Web:*
+http://localhost:3000/documentacao  
+
+💡 *Dicas:*
+• Use em um navegador para melhor visualização
+• Documentação inclui exemplos, comandos e troubleshooting
+`.trim();
   }
 }

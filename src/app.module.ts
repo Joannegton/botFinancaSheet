@@ -12,6 +12,7 @@ import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias'
 import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
 import { GerenciarConfig } from '@application/use-cases/GerenciarConfig';
 import { SchedulerService } from '@application/services/SchedulerService';
+import { DocumentacaoController } from './app/documentacao.controller';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SchedulerService } from '@application/services/SchedulerService';
       envFilePath: '.env',
     }),
   ],
+  controllers: [HealthController, DocumentacaoController],
   providers: [
     {
       provide: 'IGastoRepository',
@@ -45,6 +47,5 @@ import { SchedulerService } from '@application/services/SchedulerService';
     SchedulerService,
     MessageParser,
   ],
-  controllers: [HealthController],
 })
 export class AppModule {}

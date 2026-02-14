@@ -197,7 +197,7 @@ export class TelegramBotService implements OnModuleInit {
 
   private setupCommands(): void {
     this.logger.log(
-      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /delcategoria, /formas, /addforma, /delforma',
+      '📝 Registrando comandos: /menu, /ajuda, /documentacao, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /delcategoria, /formas, /addforma, /delforma',
     );
 
     this.bot.command('menu', async (ctx) => {
@@ -210,6 +210,11 @@ export class TelegramBotService implements OnModuleInit {
       const userId = ctx.from?.id;
       const helpMessage = await this.messageParser.getHelpMessage(userId);
       ctx.reply(helpMessage, { parse_mode: 'Markdown' });
+    });
+
+    this.bot.command('documentacao', async (ctx) => {
+      const documentacaoMessage = await this.messageParser.getDocumentacaoMessage();
+      ctx.reply(documentacaoMessage, { parse_mode: 'Markdown' });
     });
 
     this.bot.command('criar', async (ctx) => {
