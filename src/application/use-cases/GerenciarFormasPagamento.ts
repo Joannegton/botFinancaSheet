@@ -55,6 +55,22 @@ export class GerenciarFormasPagamento {
     }
   }
 
+  async deletarFormaPorIndice(indice: number): Promise<string> {
+    const formas = await this.formasPagamentoRepository.buscarTodas();
+
+    if (indice < 1 || indice > formas.length) {
+      throw new Error(`Índice inválido. Use um número entre 1 e ${formas.length}`);
+    }
+
+    const formaRemovida = formas[indice - 1];
+    const novasFormas = formas.filter((_, i) => i !== indice - 1);
+
+    await this.formasPagamentoRepository.salvarTodas(novasFormas);
+    this.logger.log(`✅ Forma de pagamento removida: ${formaRemovida}`);
+
+    return formaRemovida;
+  }
+
   async formatarListaFormas(formas: string[]): Promise<string> {
     return formas.map((forma, index) => `${index + 1}. ${forma}`).join('\n');
   }

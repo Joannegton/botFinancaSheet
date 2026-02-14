@@ -166,6 +166,32 @@ export class FormasPagamentoGoogleSheetsRepository
     }
   }
 
+  async salvarTodas(formas: string[]): Promise<void> {
+    try {
+      const formasFormatadas = formas.map((f) => [f.toLowerCase().trim()]);
+
+      // Clear existing data (except header)
+      await this.sheets.spreadsheets.values.clear({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.sheetName}!A2:A`,
+      });
+
+      if (formasFormatadas.length > 0) {
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.sheetName}!A2`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: formasFormatadas,
+          },
+        });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      throw new Error(`Erro ao salvar todas as formas de pagamento: ${msg}`);
+    }
+  }
+
   async existe(forma: string): Promise<boolean> {
     const formas = await this.buscarTodas();
     return formas.includes(forma.toLowerCase().trim());

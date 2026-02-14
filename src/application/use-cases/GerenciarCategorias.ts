@@ -55,6 +55,22 @@ export class GerenciarCategorias {
     }
   }
 
+  async deletarCategoriaPorIndice(indice: number): Promise<string> {
+    const categorias = await this.categoriasRepository.buscarTodas();
+
+    if (indice < 1 || indice > categorias.length) {
+      throw new Error(`Índice inválido. Use um número entre 1 e ${categorias.length}`);
+    }
+
+    const categoriaRemovida = categorias[indice - 1];
+    const novasCategorias = categorias.filter((_, i) => i !== indice - 1);
+
+    await this.categoriasRepository.salvarTodas(novasCategorias);
+    this.logger.log(`✅ Categoria removida: ${categoriaRemovida}`);
+
+    return categoriaRemovida;
+  }
+
   async formatarListaCategorias(categorias: string[]): Promise<string> {
     return categorias.map((cat, index) => `${index + 1}. ${cat}`).join('\n');
   }

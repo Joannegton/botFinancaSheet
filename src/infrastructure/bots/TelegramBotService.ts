@@ -142,7 +142,7 @@ export class TelegramBotService implements OnModuleInit {
 
   private setupCommands(): void {
     this.logger.log(
-      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /formas, /addforma',
+      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /delcategoria, /formas, /addforma, /delforma',
     );
 
     this.bot.command('menu', (ctx) => {
@@ -181,12 +181,20 @@ export class TelegramBotService implements OnModuleInit {
       await this.adicionarCategoria(ctx);
     });
 
+    this.bot.command('delcategoria', async (ctx) => {
+      await this.deletarCategoria(ctx);
+    });
+
     this.bot.command('formas', async (ctx) => {
       await this.listarFormas(ctx);
     });
 
     this.bot.command('addforma', async (ctx) => {
       await this.adicionarForma(ctx);
+    });
+
+    this.bot.command('delforma', async (ctx) => {
+      await this.deletarForma(ctx);
     });
   }
 
@@ -421,7 +429,7 @@ export class TelegramBotService implements OnModuleInit {
       }
 
       const listaFormatada = await this.gerenciarCategorias.formatarListaCategorias(categorias);
-      const mensagem = `📂 *Categorias disponíveis:*\n\n${listaFormatada}\n\nUse /addcategoria [nome] para adicionar uma nova.`;
+      const mensagem = `📂 *Categorias disponíveis:*\n\n${listaFormatada}\n\nUse /addcategoria [nome] para adicionar uma nova.\nUse /delcategoria [número] para remover uma categoria.`;
       ctx.reply(mensagem, { parse_mode: 'Markdown' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -466,7 +474,7 @@ export class TelegramBotService implements OnModuleInit {
       }
 
       const listaFormatada = await this.gerenciarFormasPagamento.formatarListaFormas(formas);
-      const mensagem = `💳 *Formas de pagamento disponíveis:*\n\n${listaFormatada}\n\nUse /addforma [nome] para adicionar uma nova.`;
+      const mensagem = `💳 *Formas de pagamento disponíveis:*\n\n${listaFormatada}\n\nUse /addforma [nome] para adicionar uma nova.\nUse /delforma [número] para remover uma forma de pagamento.`;
       ctx.reply(mensagem, { parse_mode: 'Markdown' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -497,6 +505,70 @@ export class TelegramBotService implements OnModuleInit {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error('Erro ao adicionar forma de pagamento:', error);
+      ctx.reply(`❌ ${msg}`);
+    }
+  }
+
+  private async deletarCategoria(ctx: Context): Promise<void> {
+    try {
+      const message = ctx.message;
+      if (!message || !('text' in message)) {
+        ctx.reply('❌ Erro ao processar mensagem');
+        return;
+      }
+
+      const args = message.text?.replace('/delcategoria', '').trim() || '';
+
+      if (!args) {
+        ctx.reply(
+          '❌ Use /delcategoria [número]\n\nExemplo: /delcategoria 2\n\nVeja as categorias com /categorias para saber os números.',
+        );
+        return;
+      }
+
+      const indice = parseInt(args, 10);
+      if (isNaN(indice)) {
+        ctx.reply('❌ O argumento deve ser um número válido.');
+        return;
+      }
+
+      const categoriaRemovida = await this.gerenciarCategorias.deletarCategoriaPorIndice(indice);
+      ctx.reply(`✅ Categoria "${categoriaRemovida}" removida com sucesso!`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao deletar categoria:', error);
+      ctx.reply(`❌ ${msg}`);
+    }
+  }
+
+  private async deletarForma(ctx: Context): Promise<void> {
+    try {
+      const message = ctx.message;
+      if (!message || !('text' in message)) {
+        ctx.reply('❌ Erro ao processar mensagem');
+        return;
+      }
+
+      const args = message.text?.replace('/delforma', '').trim() || '';
+
+      if (!args) {
+        ctx.reply(
+          '❌ Use /delforma [número]\n\nExemplo: /delforma 2\n\nVeja as formas com /formas para saber os números.',
+        );
+        return;
+      }
+
+      const indice = parseInt(args, 10);
+      if (isNaN(indice)) {
+        ctx.reply('❌ O argumento deve ser um número válido.');
+        return;
+      }
+
+      const formaRemovida = await this.gerenciarFormasPagamento.deletarFormaPorIndice(indice);
+      ctx.reply(`✅ Forma de pagamento "${formaRemovida}" removida com sucesso!`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao deletar forma de pagamento:', error);
       ctx.reply(`❌ ${msg}`);
     }
   }

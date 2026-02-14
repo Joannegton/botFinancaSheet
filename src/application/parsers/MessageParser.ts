@@ -134,9 +134,11 @@ ${categoriasFormatadas}
 📂 *Gerenciar categorias:*
 /categorias - Ver todas as categorias
 /addcategoria [nome] - Adicionar nova categoria
+/delcategoria [número] - Remover categoria por posição
 
 💳 *Gerenciar formas de pagamento:*
 /formas - Ver todas as formas de pagamento
-/addforma [nome] - Adicionar nova forma de pagamento`.trim();
+/addforma [nome] - Adicionar nova forma de pagamento
+/delforma [número] - Remover forma de pagamento por posição`.trim();
   }
 }

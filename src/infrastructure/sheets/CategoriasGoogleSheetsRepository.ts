@@ -165,4 +165,30 @@ export class CategoriasGoogleSheetsRepository implements ICategoriasRepository, 
     const categorias = await this.buscarTodas();
     return categorias.includes(categoria.toLowerCase().trim());
   }
+
+  async salvarTodas(categorias: string[]): Promise<void> {
+    try {
+      const categoriasFormatadas = categorias.map((c) => [c.toLowerCase().trim()]);
+
+      // Clear existing data (except header)
+      await this.sheets.spreadsheets.values.clear({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.sheetName}!A2:A`,
+      });
+
+      if (categoriasFormatadas.length > 0) {
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${this.sheetName}!A2`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: categoriasFormatadas,
+          },
+        });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      throw new Error(`Erro ao salvar todas as categorias: ${msg}`);
+    }
+  }
 }
