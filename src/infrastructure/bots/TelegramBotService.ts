@@ -108,7 +108,7 @@ export class TelegramBotService implements OnModuleInit {
     // Enviar mensagem de boas-vindas ao iniciar
     if (this.authorizedUserId) {
       this.bot.telegram
-        .sendMessage(this.authorizedUserId, this.getWelcomeMessage(), {
+        .sendMessage(this.authorizedUserId, this.messageParser.getWelcomeMessage(), {
           parse_mode: 'Markdown',
         })
         .catch((error) => {
@@ -146,7 +146,7 @@ export class TelegramBotService implements OnModuleInit {
     );
 
     this.bot.command('menu', (ctx) => {
-      ctx.reply(this.getWelcomeMessage(), { parse_mode: 'Markdown' });
+      ctx.reply(this.messageParser.getWelcomeMessage(), { parse_mode: 'Markdown' });
     });
 
     this.bot.command('ajuda', async (ctx) => {
@@ -527,26 +527,5 @@ export class TelegramBotService implements OnModuleInit {
     }
 
     throw new Error('Tipo de gasto não reconhecido. Use /categorias para ver as disponíveis.');
-  }
-
-  private getWelcomeMessage(): string {
-    return (
-      `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
-      `Você pode registrar gastos de duas formas:\n\n` +
-      `1️⃣ *Mensagem direta:*\n` +
-      `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
-      `\`Ex: cartão nubank, 35, moradia, aluguel\`\n\n` +
-      `2️⃣ *Modo interativo:*\n` +
-      `Digite /criar\n\n` +
-      `📂 *Gerenciar categorias:*\n` +
-      `/categorias - Ver todas as categorias\n` +
-      `/addcategoria [nome] - Adicionar nova categoria\n\n` +
-      `💳 *Gerenciar formas de pagamento:*\n` +
-      `/formas - Ver todas as formas de pagamento\n` +
-      `/addforma [nome] - Adicionar nova forma de pagamento\n\n` +
-      `📝 *Mais comandos:*\n` +
-      `/ajuda - Ver ajuda completa\n` +
-      `/relatorio - Ver últimos gastos`
-    );
   }
 }

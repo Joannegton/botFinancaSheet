@@ -82,6 +82,20 @@ export class MessageParser {
     return partes.length >= 3;
   }
 
+  getWelcomeMessage(): string {
+    return (
+      `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
+      `Você pode registrar gastos de duas formas:\n\n` +
+      `1️⃣ *Mensagem direta:*\n` +
+      `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
+      `\`Ex: cartão nubank, 35, moradia, aluguel\`\n\n` +
+      `2️⃣ *Modo interativo:*\n` +
+      `Digite /criar\n\n` +
+      `📝 *Conheça o funcionamento:*\n` +
+      `/ajuda - Ver ajuda completa e todas as funcionalidades`
+    );
+  }
+
   /**
    * Gera mensagem de ajuda
    */
@@ -89,11 +103,10 @@ export class MessageParser {
     const formas = await this.gerenciarFormasPagamento.buscarTodas();
     const categorias = await this.gerenciarCategorias.buscarTodas();
 
-    const formasFormatadas = formas.map((f) => `• ${f}`).join('\n');
-    const categoriasFormatadas = categorias.map((c) => `• ${c}`).join('\n');
+    const formasFormatadas = formas.map((f) => `  • ${f}`).join('\n');
+    const categoriasFormatadas = categorias.map((c) => `  • ${c}`).join('\n');
 
-    return `
-📝 *Como registrar um gasto:*
+    return `📝 *Como registrar um gasto:*
 
 *Formato:*
 \`[forma], [valor], [tipo], [observação]\`
@@ -109,16 +122,21 @@ ${formasFormatadas}
 *Tipos de gasto disponíveis:*
 ${categoriasFormatadas}
 
-*Comandos disponíveis:*
-/menu - Ver mensagem de boas-vindas
-/ajuda - Ver este guia completo
+🔧 *Comandos de registro:*
 /criar - Modo interativo para registrar gasto
 /cancelar - Cancelar operação atual
+
+📊 *Comandos de consulta:*
+/menu - Ver mensagem de boas-vindas
+/ajuda - Ver este guia completo
 /relatorio - Ver últimos gastos
+
+📂 *Gerenciar categorias:*
 /categorias - Ver todas as categorias
 /addcategoria [nome] - Adicionar nova categoria
+
+💳 *Gerenciar formas de pagamento:*
 /formas - Ver todas as formas de pagamento
-/addforma [nome] - Adicionar nova forma de pagamento
-    `.trim();
+/addforma [nome] - Adicionar nova forma de pagamento`.trim();
   }
 }
