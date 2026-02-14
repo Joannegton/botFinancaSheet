@@ -132,10 +132,10 @@ export class TelegramBotService implements OnModuleInit {
 
   private setupCommands(): void {
     this.logger.log(
-      '📝 Registrando comandos: /start, /ajuda, /menu, /cancelar, /relatorio, /categorias, /addcategoria',
+      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria',
     );
 
-    this.bot.command('start', (ctx) => {
+    this.bot.command('menu', (ctx) => {
       ctx.reply(this.getWelcomeMessage(), { parse_mode: 'Markdown' });
     });
 
@@ -143,7 +143,7 @@ export class TelegramBotService implements OnModuleInit {
       ctx.reply(this.messageParser.getHelpMessage(), { parse_mode: 'Markdown' });
     });
 
-    this.bot.command('menu', async (ctx) => {
+    this.bot.command('criar', async (ctx) => {
       await this.startInteractiveFlow(ctx);
     });
 
@@ -310,7 +310,7 @@ export class TelegramBotService implements OnModuleInit {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error('Erro no fluxo interativo:', error);
       this.sessions.delete(userId);
-      ctx.reply(`❌ Erro: ${msg}\n\nTente novamente com /menu`, {
+      ctx.reply(`❌ Erro: ${msg}\n\nTente novamente com /criar`, {
         reply_markup: { remove_keyboard: true },
       });
     }
@@ -320,7 +320,7 @@ export class TelegramBotService implements OnModuleInit {
     try {
       if (!this.messageParser.isGastoMessage(mensagem)) {
         ctx.reply(
-          '❓ Não entendi.\n Digite /ajuda para ver como registrar um gasto ou /menu para modo interativo.',
+          '❓ Não entendi.\n Digite /ajuda para ver como registrar um gasto ou /criar para modo interativo.',
         );
         return;
       }
@@ -448,8 +448,8 @@ export class TelegramBotService implements OnModuleInit {
       `Você pode registrar gastos de duas formas:\n\n` +
       `1️⃣ *Mensagem direta:*\n` +
       `\`cartao, 35, comida, almoço\`\n\n` +
-      `2️⃣ *Menu interativo:*\n` +
-      `Digite /menu\n\n` +
+      `2️⃣ *Modo interativo:*\n` +
+      `Digite /criar\n\n` +
       `📂 *Gerenciar categorias:*\n` +
       `/categorias - Ver todas as categorias\n` +
       `/addcategoria [nome] - Adicionar nova categoria\n\n` +
