@@ -191,10 +191,10 @@ ${categoriasFormatadas}
   async getDocumentacaoMessage(): Promise<string> {
     return `📚 *Documentação Completa*
 
-Acesse a documentação completa do sistema através dos links abaixo:
+Acesse a documentação completa do sistema através do link abaixo:
 
 🌐 *Documentação Web:*
-http://localhost:3000/documentacao  
+[https://botfinancasheet.fly.dev/documentacao](https://botfinancasheet.fly.dev/documentacao)
 
 💡 *Dicas:*
 • Use em um navegador para melhor visualização
