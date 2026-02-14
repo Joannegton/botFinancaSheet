@@ -21,6 +21,7 @@ export class TelegramBotService implements OnModuleInit {
   private readonly logger = new Logger(TelegramBotService.name);
   private bot!: Telegraf;
   private authorizedUserId!: number;
+  private botUsername: string = '';
   private sessions: Map<number, SessionData> = new Map();
 
   constructor(
@@ -73,8 +74,16 @@ export class TelegramBotService implements OnModuleInit {
       this.logger.error(`Erro ao manter bot conectado: ${msg}`);
     });
 
-    this.logger.log('✨ Bot do Telegram iniciado com sucesso!');
-    this.logger.log('📡 Aguardando mensagens em modo polling...');
+    try {
+      const botInfo = await this.bot.telegram.getMe();
+      this.botUsername = botInfo.username || '';
+      this.logger.log(`✨ Bot do Telegram iniciado com sucesso!`);
+      this.logger.log(`🤖 Nome do bot: @${botInfo.username}`);
+      this.logger.log(`📡 Aguardando mensagens em modo polling...`);
+    } catch (error) {
+      this.logger.log('✨ Bot do Telegram iniciado com sucesso!');
+      this.logger.log('📡 Aguardando mensagens em modo polling...');
+    }
 
     // Enviar mensagem de boas-vindas ao iniciar
     if (this.authorizedUserId) {
@@ -84,7 +93,20 @@ export class TelegramBotService implements OnModuleInit {
         })
         .catch((error) => {
           const msg = error instanceof Error ? error.message : 'Erro desconhecido';
-          this.logger.warn(`⚠️ Não foi possível enviar mensagem de boas-vindas: ${msg}`);
+
+          if (msg.includes('403')) {
+            this.logger.warn(
+              `⚠️  Não foi possível enviar a mensagem de boas-vindas!\n` +
+                `📱 Por favor, siga os passos:\n` +
+                `   1. Abra o Telegram\n` +
+                `   2. Pesquise pelo nome @${this.botUsername} na lupa\n` +
+                `   3. Clique em "Desbloquear" (se estiver bloqueado)\n` +
+                `   4. Clique em "Iniciar" para começar a conversa\n` +
+                `🔄 Após fazer isso, a mensagem de boas-vindas será enviada automaticamente!`,
+            );
+          } else {
+            this.logger.warn(`⚠️ Erro ao enviar mensagem de boas-vindas: ${msg}`);
+          }
         });
     }
 
@@ -365,7 +387,7 @@ export class TelegramBotService implements OnModuleInit {
       `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
       `Você pode registrar gastos de duas formas:\n\n` +
       `1️⃣ *Mensagem direta:*\n` +
-      `\`cartao - 35 - comida - almoço\`\n\n` +
+      `\`cartao, 35, comida, almoço\`\n\n` +
       `2️⃣ *Menu interativo:*\n` +
       `Digite /menu\n\n` +
       `Digite /ajuda para ver todos os comandos.`

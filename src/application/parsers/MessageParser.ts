@@ -15,18 +15,18 @@ export interface MensagemParsed {
 export class MessageParser {
   /**
    * Parse de mensagem no formato:
-   * cartao - final 1234 - 35 - comida - almoço no centro
+   * cartao, final 1234, 35, comida, almoço no centro
    * ou
-   * pix - 50 - transporte - uber
+   * pix, 50, transporte, uber
    * ou
-   * dinheiro - 20 - comida
+   * dinheiro, 20, comida
    */
   parse(mensagem: string): Gasto {
-    const partes = mensagem.split('-').map((p) => p.trim());
+    const partes = mensagem.split(',').map((p) => p.trim());
 
     if (partes.length < 3) {
       throw new Error(
-        'Formato inválido. Use: [forma_pagamento] - [valor] - [tipo] - [observação opcional]',
+        'Formato inválido. Use: [forma_pagamento], [valor], [tipo], [observação opcional]',
       );
     }
 
@@ -37,17 +37,17 @@ export class MessageParser {
 
     // Se começar com "final", é cartão com número
     if (partes.length >= 4 && partes[1].toLowerCase().startsWith('final')) {
-      // cartao - final 1234 - 35 - comida - observacao
+      // cartao, final 1234, 35, comida, observacao
       formaPagamentoStr = partes[0];
       valorStr = partes[2];
       tipoStr = partes[3];
-      observacao = partes.slice(4).join(' - ').trim() || undefined;
+      observacao = partes.slice(4).join(', ').trim() || undefined;
     } else {
-      // Formato simples: pix - 50 - comida - observacao
+      // Formato simples: pix, 50, comida, observacao
       formaPagamentoStr = partes[0];
       valorStr = partes[1];
       tipoStr = partes[2];
-      observacao = partes.slice(3).join(' - ').trim() || undefined;
+      observacao = partes.slice(3).join(', ').trim() || undefined;
     }
 
     try {
@@ -67,7 +67,7 @@ export class MessageParser {
    * Valida se a mensagem parece ser um registro de gasto
    */
   isGastoMessage(mensagem: string): boolean {
-    const partes = mensagem.split('-');
+    const partes = mensagem.split(',');
     return partes.length >= 3;
   }
 
@@ -79,7 +79,7 @@ export class MessageParser {
 📝 *Como registrar um gasto:*
 
 *Formato:*
-\`[forma] - [valor] - [tipo] - [observação]\`
+\`[forma], [valor], [tipo], [observação]\`
 
 *Formas de pagamento:*
 • cartao
@@ -97,10 +97,10 @@ export class MessageParser {
 • outros
 
 *Exemplos:*
-\`cartao - 35 - comida - almoço no centro\`
-\`pix - 50.50 - transporte - uber\`
-\`dinheiro - 20 - lazer\`
-\`cartao - final 1234 - 150 - saude - consulta\`
+\`cartao, 35, comida, almoço no centro\`
+\`pix, 50.50, transporte, uber\`
+\`dinheiro, 20, lazer\`
+\`cartao, final 1234, 150, saude, consulta\`
 
 Digite /menu para ver opções interativas.
     `.trim();
