@@ -3,6 +3,8 @@ import { Gasto } from '@domain/entities/Gasto';
 import { FormaPagamento } from '@domain/value-objects/FormaPagamento';
 import { TipoGasto } from '@domain/value-objects/TipoGasto';
 import { Valor } from '@domain/value-objects/Valor';
+import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
+import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
 
 export interface MensagemParsed {
   formaPagamento: string;
@@ -13,15 +15,19 @@ export interface MensagemParsed {
 
 @Injectable()
 export class MessageParser {
+  constructor(
+    private readonly gerenciarFormasPagamento: GerenciarFormasPagamento,
+    private readonly gerenciarCategorias: GerenciarCategorias,
+  ) {}
   /**
    * Parse de mensagem no formato:
-   * cartao, final 1234, 35, comida, almoço no centro
+   * cartão nubank, 35, comida, almoço no centro
    * ou
    * pix, 50, transporte, uber
    * ou
    * dinheiro, 20, comida
    */
-  parse(mensagem: string): Gasto {
+  async parse(mensagem: string): Promise<Gasto> {
     const partes = mensagem.split(',').map((p) => p.trim());
 
     if (partes.length < 3) {
@@ -30,30 +36,35 @@ export class MessageParser {
       );
     }
 
-    let formaPagamentoStr = partes[0];
-    let valorStr: string;
-    let tipoStr: string;
-    let observacao: string | undefined;
-
-    // Se começar com "final", é cartão com número
-    if (partes.length >= 4 && partes[1].toLowerCase().startsWith('final')) {
-      // cartao, final 1234, 35, comida, observacao
-      formaPagamentoStr = partes[0];
-      valorStr = partes[2];
-      tipoStr = partes[3];
-      observacao = partes.slice(4).join(', ').trim() || undefined;
-    } else {
-      // Formato simples: pix, 50, comida, observacao
-      formaPagamentoStr = partes[0];
-      valorStr = partes[1];
-      tipoStr = partes[2];
-      observacao = partes.slice(3).join(', ').trim() || undefined;
-    }
+    const formaPagamentoStr = partes[0];
+    const valorStr = partes[1];
+    const tipoStr = partes[2];
+    const observacao = partes.slice(3).join(', ').trim() || undefined;
 
     try {
-      const formaPagamento = new FormaPagamento(formaPagamentoStr);
+      // Validar forma de pagamento
+      const formasValidas = await this.gerenciarFormasPagamento.buscarTodas();
+      const formaNormalizada = formaPagamentoStr.toLowerCase().trim();
+      const formaValida = formasValidas.find((f) => f.toLowerCase() === formaNormalizada);
+      if (!formaValida) {
+        throw new Error(
+          `Forma de pagamento inválida: ${formaPagamentoStr}. Use /formas para ver as opções válidas`,
+        );
+      }
+
+      // Validar tipo de gasto
+      const tiposValidos = await this.gerenciarCategorias.buscarTodas();
+      const tipoNormalizado = tipoStr.toLowerCase().trim();
+      const tipoValido = tiposValidos.find((t) => t.toLowerCase() === tipoNormalizado);
+      if (!tipoValido) {
+        throw new Error(
+          `Tipo de gasto inválido: ${tipoStr}. Use /categorias para ver as opções válidas`,
+        );
+      }
+
+      const formaPagamento = new FormaPagamento(formaValida);
       const valor = Valor.fromString(valorStr);
-      const tipo = new TipoGasto(tipoStr);
+      const tipo = new TipoGasto(tipoValido);
       const dataHora = new Date();
 
       return new Gasto(dataHora, formaPagamento, tipo, valor, observacao);
@@ -74,35 +85,40 @@ export class MessageParser {
   /**
    * Gera mensagem de ajuda
    */
-  getHelpMessage(): string {
+  async getHelpMessage(): Promise<string> {
+    const formas = await this.gerenciarFormasPagamento.buscarTodas();
+    const categorias = await this.gerenciarCategorias.buscarTodas();
+
+    const formasFormatadas = formas.map((f) => `• ${f}`).join('\n');
+    const categoriasFormatadas = categorias.map((c) => `• ${c}`).join('\n');
+
     return `
 📝 *Como registrar um gasto:*
 
 *Formato:*
 \`[forma], [valor], [tipo], [observação]\`
 
-*Formas de pagamento:*
-• cartao
-• pix  
-• dinheiro
-
-*Tipos de gasto:*
-• comida
-• transporte
-• lazer
-• saude
-• educacao
-• moradia
-• vestuario
-• outros
-
 *Exemplos:*
-\`cartao, 35, comida, almoço no centro\`
-\`pix, 50.50, transporte, uber\`
-\`dinheiro, 20, lazer\`
-\`cartao, final 1234, 150, saude, consulta\`
+\`${formas[0] || 'cartao'}, 35, ${categorias[0] || 'comida'}, almoço no centro\`
+\`${formas[1] || 'pix'}, 50.50, ${categorias[1] || 'transporte'}, uber\`
+\`${formas[2] || 'dinheiro'}, 20, ${categorias[2] || 'lazer'}\`
 
-Digite /menu para ver opções interativas.
+*Formas de pagamento disponíveis:*
+${formasFormatadas}
+
+*Tipos de gasto disponíveis:*
+${categoriasFormatadas}
+
+*Comandos disponíveis:*
+/menu - Ver mensagem de boas-vindas
+/ajuda - Ver este guia completo
+/criar - Modo interativo para registrar gasto
+/cancelar - Cancelar operação atual
+/relatorio - Ver últimos gastos
+/categorias - Ver todas as categorias
+/addcategoria [nome] - Adicionar nova categoria
+/formas - Ver todas as formas de pagamento
+/addforma [nome] - Adicionar nova forma de pagamento
     `.trim();
   }
 }

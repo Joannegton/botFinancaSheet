@@ -5,6 +5,7 @@ import { message } from 'telegraf/filters';
 import { MessageParser } from '@application/parsers/MessageParser';
 import { RegistrarGasto } from '@application/use-cases/RegistrarGasto';
 import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
+import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
 import { FormaPagamento } from '@domain/value-objects/FormaPagamento';
 import { TipoGasto } from '@domain/value-objects/TipoGasto';
 import { Valor } from '@domain/value-objects/Valor';
@@ -30,6 +31,7 @@ export class TelegramBotService implements OnModuleInit {
     private readonly messageParser: MessageParser,
     private readonly registrarGasto: RegistrarGasto,
     private readonly gerenciarCategorias: GerenciarCategorias,
+    private readonly gerenciarFormasPagamento: GerenciarFormasPagamento,
   ) {}
 
   async onModuleInit() {
@@ -95,6 +97,14 @@ export class TelegramBotService implements OnModuleInit {
       this.logger.warn(`⚠️ Erro ao inicializar categorias: ${msg}`);
     }
 
+    // Inicializar formas de pagamento padrão se necessário
+    try {
+      await this.gerenciarFormasPagamento.inicializarFormasIfNeeded();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.warn(`⚠️ Erro ao inicializar formas de pagamento: ${msg}`);
+    }
+
     // Enviar mensagem de boas-vindas ao iniciar
     if (this.authorizedUserId) {
       this.bot.telegram
@@ -132,15 +142,16 @@ export class TelegramBotService implements OnModuleInit {
 
   private setupCommands(): void {
     this.logger.log(
-      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria',
+      '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /formas, /addforma',
     );
 
     this.bot.command('menu', (ctx) => {
       ctx.reply(this.getWelcomeMessage(), { parse_mode: 'Markdown' });
     });
 
-    this.bot.command('ajuda', (ctx) => {
-      ctx.reply(this.messageParser.getHelpMessage(), { parse_mode: 'Markdown' });
+    this.bot.command('ajuda', async (ctx) => {
+      const helpMessage = await this.messageParser.getHelpMessage();
+      ctx.reply(helpMessage, { parse_mode: 'Markdown' });
     });
 
     this.bot.command('criar', async (ctx) => {
@@ -168,6 +179,14 @@ export class TelegramBotService implements OnModuleInit {
 
     this.bot.command('addcategoria', async (ctx) => {
       await this.adicionarCategoria(ctx);
+    });
+
+    this.bot.command('formas', async (ctx) => {
+      await this.listarFormas(ctx);
+    });
+
+    this.bot.command('addforma', async (ctx) => {
+      await this.adicionarForma(ctx);
     });
   }
 
@@ -210,12 +229,29 @@ export class TelegramBotService implements OnModuleInit {
 
     this.sessions.set(userId, { step: 'aguardando_forma' });
 
-    ctx.reply('💳 *Escolha a forma de pagamento:*', {
-      parse_mode: 'Markdown',
-      ...Markup.keyboard([['💳 Cartão', '📱 Pix', '💵 Dinheiro'], ['❌ Cancelar']])
-        .resize()
-        .oneTime(),
-    });
+    try {
+      const formas = await this.gerenciarFormasPagamento.buscarTodas();
+      const linhas = [];
+      for (let i = 0; i < formas.length; i += 2) {
+        const botoes = [];
+        botoes.push(formas[i]);
+        if (i + 1 < formas.length) {
+          botoes.push(formas[i + 1]);
+        }
+        linhas.push(botoes);
+      }
+      linhas.push(['❌ Cancelar']);
+
+      const listaFormasFormatada = formas.join(', ');
+      ctx.reply(`💳 *Escolha a forma de pagamento:*\n\n${listaFormasFormatada}`, {
+        parse_mode: 'Markdown',
+        ...Markup.keyboard(linhas).resize().oneTime(),
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao iniciar fluxo interativo:', error);
+      ctx.reply(`❌ Erro: ${msg}`);
+    }
   }
 
   private async handleInteractiveFlow(
@@ -227,7 +263,7 @@ export class TelegramBotService implements OnModuleInit {
     try {
       switch (session.step) {
         case 'aguardando_forma':
-          const forma = this.extractFormaPagamento(mensagem);
+          const forma = await this.extractFormaPagamento(mensagem);
           session.formaPagamento = forma;
           session.step = 'aguardando_valor';
           // this.sessions.set(userId, session);
@@ -325,7 +361,7 @@ export class TelegramBotService implements OnModuleInit {
         return;
       }
 
-      const gasto = this.messageParser.parse(mensagem);
+      const gasto = await this.messageParser.parse(mensagem);
       await this.registrarGasto.execute(gasto);
 
       ctx.reply(
@@ -420,12 +456,63 @@ export class TelegramBotService implements OnModuleInit {
     }
   }
 
-  private extractFormaPagamento(mensagem: string): string {
-    const lower = mensagem.toLowerCase();
-    if (lower.includes('cartao') || lower.includes('cartão')) return 'cartao';
-    if (lower.includes('pix')) return 'pix';
-    if (lower.includes('dinheiro')) return 'dinheiro';
-    throw new Error('Forma de pagamento não reconhecida');
+  private async listarFormas(ctx: Context): Promise<void> {
+    try {
+      const formas = await this.gerenciarFormasPagamento.buscarTodas();
+
+      if (formas.length === 0) {
+        ctx.reply('💳 Nenhuma forma de pagamento registrada ainda. Use /addforma para adicionar.');
+        return;
+      }
+
+      const listaFormatada = await this.gerenciarFormasPagamento.formatarListaFormas(formas);
+      const mensagem = `💳 *Formas de pagamento disponíveis:*\n\n${listaFormatada}\n\nUse /addforma [nome] para adicionar uma nova.`;
+      ctx.reply(mensagem, { parse_mode: 'Markdown' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao listar formas de pagamento:', error);
+      ctx.reply(`❌ Erro ao listar formas de pagamento: ${msg}`);
+    }
+  }
+
+  private async adicionarForma(ctx: Context): Promise<void> {
+    try {
+      const message = ctx.message;
+      if (!message || !('text' in message)) {
+        ctx.reply('❌ Erro ao processar mensagem');
+        return;
+      }
+
+      const args = message.text?.replace('/addforma', '').trim() || '';
+
+      if (!args) {
+        ctx.reply(
+          '❌ Use /addforma [nome]\n\nExemplo: /addforma credito\n\nA forma de pagamento não pode ter mais de 20 caracteres.',
+        );
+        return;
+      }
+
+      const novaForma = await this.gerenciarFormasPagamento.adicionarForma(args);
+      ctx.reply(`✅ Forma de pagamento "${novaForma}" adicionada com sucesso!`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao adicionar forma de pagamento:', error);
+      ctx.reply(`❌ ${msg}`);
+    }
+  }
+
+  private async extractFormaPagamento(mensagem: string): Promise<string> {
+    const lower = mensagem.toLowerCase().trim();
+    const formas = await this.gerenciarFormasPagamento.buscarTodas();
+
+    // Procura correspondência exata ou parcial
+    for (const forma of formas) {
+      if (lower === forma || lower.includes(forma)) {
+        return forma;
+      }
+    }
+
+    throw new Error('Forma de pagamento não reconhecida. Use /formas para ver as disponíveis.');
   }
 
   private async extractTipo(mensagem: string): Promise<string> {
@@ -447,14 +534,18 @@ export class TelegramBotService implements OnModuleInit {
       `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
       `Você pode registrar gastos de duas formas:\n\n` +
       `1️⃣ *Mensagem direta:*\n` +
-      `\`cartao, 35, comida, almoço\`\n\n` +
+      `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
+      `\`Ex: cartão nubank, 35, moradia, aluguel\`\n\n` +
       `2️⃣ *Modo interativo:*\n` +
       `Digite /criar\n\n` +
       `📂 *Gerenciar categorias:*\n` +
       `/categorias - Ver todas as categorias\n` +
       `/addcategoria [nome] - Adicionar nova categoria\n\n` +
+      `💳 *Gerenciar formas de pagamento:*\n` +
+      `/formas - Ver todas as formas de pagamento\n` +
+      `/addforma [nome] - Adicionar nova forma de pagamento\n\n` +
       `📝 *Mais comandos:*\n` +
-      `/ajuda - Ver guia completo\n` +
+      `/ajuda - Ver ajuda completa\n` +
       `/relatorio - Ver últimos gastos`
     );
   }

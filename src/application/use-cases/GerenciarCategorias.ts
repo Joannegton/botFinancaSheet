@@ -4,16 +4,7 @@ import { ICategoriasRepository } from '@domain/repositories/ICategoriasRepositor
 @Injectable()
 export class GerenciarCategorias {
   private readonly logger = new Logger(GerenciarCategorias.name);
-  private readonly CATEGORIAS_PADRAO = [
-    'comida',
-    'transporte',
-    'lazer',
-    'saude',
-    'educacao',
-    'moradia',
-    'vestuario',
-    'outros',
-  ];
+  private readonly CATEGORIAS_PADRAO = ['moradia', 'vestuario', 'outros'];
 
   constructor(
     @Inject('ICategoriasRepository')
