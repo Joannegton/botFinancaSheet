@@ -429,7 +429,7 @@ export class TelegramBotService implements OnModuleInit {
       }
 
       const listaFormatada = await this.gerenciarCategorias.formatarListaCategorias(categorias);
-      const mensagem = `📂 *Categorias disponíveis:*\n\n${listaFormatada}\n\nUse /addcategoria [nome] para adicionar uma nova.\nUse /delcategoria [número] para remover uma categoria.`;
+      const mensagem = `📂 *Categorias disponíveis:*\n\n${listaFormatada}\n\nUse /addcategoria [nome] - para adicionar uma nova.\nUse /delcategoria [número] - para remover uma categoria.`;
       ctx.reply(mensagem, { parse_mode: 'Markdown' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -474,7 +474,7 @@ export class TelegramBotService implements OnModuleInit {
       }
 
       const listaFormatada = await this.gerenciarFormasPagamento.formatarListaFormas(formas);
-      const mensagem = `💳 *Formas de pagamento disponíveis:*\n\n${listaFormatada}\n\nUse /addforma [nome] para adicionar uma nova.\nUse /delforma [número] para remover uma forma de pagamento.`;
+      const mensagem = `💳 *Formas de pagamento disponíveis:*\n\n${listaFormatada}\n\nUse /addforma [nome] - para adicionar uma nova.\nUse /delforma [número] - para remover uma forma de pagamento.`;
       ctx.reply(mensagem, { parse_mode: 'Markdown' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
