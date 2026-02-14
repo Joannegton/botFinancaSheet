@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, sheets_v4 } from 'googleapis';
-import * as fs from 'fs/promises';
 import { IGastoRepository } from '@domain/repositories/IGastoRepository';
 import { Gasto } from '@domain/entities/Gasto';
 import { FormaPagamento } from '@domain/value-objects/FormaPagamento';
@@ -16,7 +15,6 @@ export class GoogleSheetsRepository implements IGastoRepository, OnModuleInit {
   private sheetName!: string;
   private sheetId!: number;
   private readonly HEADER_ROW = ['Data/Hora', 'Forma Pagamento', 'Tipo', 'Valor', 'Observação'];
-  private readonly CREDENTIALS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS as string;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -25,23 +23,25 @@ export class GoogleSheetsRepository implements IGastoRepository, OnModuleInit {
   }
 
   private async authorize() {
-    const content = await fs.readFile(this.CREDENTIALS_PATH, 'utf-8');
-    const credentials = JSON.parse(content);
+    const credentialsJson = this.configService.get<string>('GOOGLE_APPLICATION_CREDENTIALS');
 
-    if (credentials.type !== 'service_account') {
-      throw new Error(
-        'credentials.json deve ser do tipo "service_account". ' +
-          'Este é um arquivo especial para bots. ' +
-          'Veja: https://console.cloud.google.com/apis/credentials',
-      );
+    if (!credentialsJson) {
+      throw new Error('GOOGLE_APPLICATION_CREDENTIALS não configurada');
     }
 
-    const auth = new google.auth.GoogleAuth({
-      keyFile: this.CREDENTIALS_PATH,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    try {
+      const credentials = JSON.parse(credentialsJson);
 
-    return auth.getClient();
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+
+      return auth.getClient();
+    } catch (error) {
+      this.logger.error(`Erro ao fazer parse do JSON das credenciais: ${error}`);
+      throw error;
+    }
   }
 
   private async initialize(): Promise<void> {
