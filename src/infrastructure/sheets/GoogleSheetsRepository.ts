@@ -529,16 +529,29 @@ export class GoogleSheetsRepository implements IGastoRepository, OnModuleInit {
 
       const rows = response.data.values || [];
 
-      // Filtrar linhas de totais (que começam com "Total")
+      // Filtrar linhas de totais (que começam com "Total") e linhas incompletas
       return rows
-        .filter((row) => row[0] !== 'Total')
+        .filter((row) => {
+          // Verificar se a linha tem pelo menos 4 colunas (data, forma, tipo, valor)
+          if (!row || row.length < 4) return false;
+          // Verificar se a primeira coluna é string "Total" (evita processar linhas de totais)
+          const primeiraColuna = (row[0] || '').toString().trim().toUpperCase();
+          if (primeiraColuna === 'TOTAL') return false;
+          // Verificar se as colunas essenciais têm valores
+          if (!row[0] || !row[1] || !row[2] || !row[3]) return false;
+          // Verificar se o valor é válido (não vazio ou apenas espaços)
+          if (row[3].toString().trim() === '') return false;
+          return true;
+        })
         .map((row) => {
           const [dataHoraStr, formaPagamentoStr, tipoStr, valorStr, observacao] = row;
 
           const dataHora = this.parseDate(dataHoraStr);
           const formaPagamento = new FormaPagamento(formaPagamentoStr);
           const tipo = new TipoGasto(tipoStr);
-          const valor = new Valor(Number(valorStr));
+          // Normalizar valor: substituir vírgula por ponto (formato brasileiro para número)
+          const valorNormalizado = Number(valorStr.toString().replace(',', '.'));
+          const valor = new Valor(valorNormalizado);
 
           return new Gasto(dataHora, formaPagamento, tipo, valor, observacao || undefined);
         });
@@ -550,14 +563,9 @@ export class GoogleSheetsRepository implements IGastoRepository, OnModuleInit {
   }
 
   private parseDate(dateStr: string): Date {
-    const date = new Date(dateStr);
-
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-
-    const brFormat = /(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})/;
-    const match = dateStr.match(brFormat);
+    // Formato padrão do Google Sheets: DD/MM/YYYY, HH:MM:SS
+    const format = /(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2}):(\d{2})/;
+    const match = dateStr.match(format);
 
     if (match) {
       const [, day, month, year, hour, minute, second] = match;
@@ -571,6 +579,8 @@ export class GoogleSheetsRepository implements IGastoRepository, OnModuleInit {
       );
     }
 
-    return new Date();
+    // Fallback: tentar parsing padrão do JavaScript
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime()) ? date : new Date();
   }
 }

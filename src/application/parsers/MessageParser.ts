@@ -5,6 +5,7 @@ import { TipoGasto } from '@domain/value-objects/TipoGasto';
 import { Valor } from '@domain/value-objects/Valor';
 import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
 import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
+import { GerenciarConfig } from '@application/use-cases/GerenciarConfig';
 
 export interface MensagemParsed {
   formaPagamento: string;
@@ -18,6 +19,7 @@ export class MessageParser {
   constructor(
     private readonly gerenciarFormasPagamento: GerenciarFormasPagamento,
     private readonly gerenciarCategorias: GerenciarCategorias,
+    private readonly gerenciarConfig: GerenciarConfig,
   ) {}
   /**
    * Parse de mensagem no formato:
@@ -82,9 +84,41 @@ export class MessageParser {
     return partes.length >= 3;
   }
 
-  getWelcomeMessage(): string {
+  async getMenuMessage(userId?: number): Promise<string> {
+    let configText = `/config - Configurar dados`;
+    let tituloTexto = '👋 Olá! Bem-vindo ao *Registro de Gastos*!';
+
+    if (userId) {
+      try {
+        const diaInicio = await this.gerenciarConfig.obterDiaInicio(userId);
+        if (diaInicio !== null) {
+          // Calcular dias faltantes até o próximo mês
+          const hoje = new Date();
+          const diaAtual = hoje.getDate();
+          const mesAtual = hoje.getMonth();
+          const anoAtual = hoje.getFullYear();
+
+          let diasFaltantes: number;
+          if (diaInicio > diaAtual) {
+            // No mesmo mês
+            diasFaltantes = diaInicio - diaAtual;
+          } else {
+            // Próximo mês
+            const diaInicioProxMes = new Date(anoAtual, mesAtual + 1, diaInicio);
+            diasFaltantes = Math.ceil(
+              (diaInicioProxMes.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
+            );
+          }
+          tituloTexto = '👋 Bem vindo de volta!';
+          configText = `\nSeu mês inicia em ${diasFaltantes} ${diasFaltantes === 1 ? 'dia' : 'dias'}`;
+        }
+      } catch (error) {
+        // Se houver erro, mantém texto padrão
+      }
+    }
+
     return (
-      `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
+      `${tituloTexto}\n\n` +
       `Você pode registrar gastos de duas formas:\n\n` +
       `1️⃣ *Mensagem direta:*\n` +
       `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
@@ -92,21 +126,28 @@ export class MessageParser {
       `2️⃣ *Modo interativo:*\n` +
       `Digite /criar\n\n` +
       `📝 *Conheça o funcionamento:*\n` +
-      `/ajuda - Ver ajuda completa e todas as funcionalidades`
+      `/ajuda - Ver ajuda completa e todas as funcionalidades\n` +
+      `${configText}`
     );
   }
 
-  /**
-   * Gera mensagem de ajuda
-   */
-  async getHelpMessage(): Promise<string> {
+  async getHelpMessage(userId?: number): Promise<string> {
     const formas = await this.gerenciarFormasPagamento.buscarTodas();
     const categorias = await this.gerenciarCategorias.buscarTodas();
 
     const formasFormatadas = formas.map((f) => `  • ${f}`).join('\n');
     const categoriasFormatadas = categorias.map((c) => `  • ${c}`).join('\n');
 
-    return `📝 *Como registrar um gasto:*
+    // Verificar se usuário tem config completa
+    let avisoConfig = '';
+    if (userId) {
+      const diaInicio = await this.gerenciarConfig.obterDiaInicio(userId);
+      if (diaInicio === null) {
+        avisoConfig = `⚠️ *Atenção:* Você ainda não configurou o seu mês!\nUse /config para definir o dia de início do seu mês.\n\n`;
+      }
+    }
+
+    return `${avisoConfig}📝 *Como registrar um gasto:*
 
 *Formato:*
 \`[forma], [valor], [tipo], [observação]\`
@@ -127,7 +168,7 @@ ${categoriasFormatadas}
 /cancelar - Cancelar operação atual
 
 📊 *Comandos de consulta:*
-/menu - Ver mensagem de boas-vindas
+/menu - Inicio
 /ajuda - Ver este guia completo
 /relatorio - Ver últimos gastos
 
@@ -139,6 +180,9 @@ ${categoriasFormatadas}
 💳 *Gerenciar formas de pagamento:*
 /formas - Ver todas as formas de pagamento
 /addforma [nome] - Adicionar nova forma de pagamento
-/delforma [número] - Remover forma de pagamento por posição`.trim();
+/delforma [número] - Remover forma de pagamento por posição
+
+️⚙ *Configuração:*
+/config - Configurar dados`.trim();
   }
 }

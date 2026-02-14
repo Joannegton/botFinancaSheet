@@ -26,4 +26,17 @@ export class RegistrarGasto {
       throw new Error(`Erro ao buscar gastos: ${msg}`);
     }
   }
+
+  async buscarPorPeriodo(dataInicio: Date, dataFim: Date): Promise<Gasto[]> {
+    try {
+      const todos = await this.gastoRepository.buscarTodos();
+      return todos.filter((gasto) => {
+        const dataGasto = gasto.dataHora;
+        return dataGasto >= dataInicio && dataGasto <= dataFim;
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      throw new Error(`Erro ao buscar gastos por período: ${msg}`);
+    }
+  }
 }

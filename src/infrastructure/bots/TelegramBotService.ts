@@ -6,13 +6,20 @@ import { MessageParser } from '@application/parsers/MessageParser';
 import { RegistrarGasto } from '@application/use-cases/RegistrarGasto';
 import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
 import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
+import { GerenciarConfig } from '@application/use-cases/GerenciarConfig';
+import { SchedulerService } from '@application/services/SchedulerService';
 import { FormaPagamento } from '@domain/value-objects/FormaPagamento';
 import { TipoGasto } from '@domain/value-objects/TipoGasto';
 import { Valor } from '@domain/value-objects/Valor';
 import { Gasto } from '@domain/entities/Gasto';
 
 interface SessionData {
-  step?: 'aguardando_forma' | 'aguardando_valor' | 'aguardando_tipo' | 'aguardando_observacao';
+  step?:
+    | 'aguardando_forma'
+    | 'aguardando_valor'
+    | 'aguardando_tipo'
+    | 'aguardando_observacao'
+    | 'aguardando_config_dia';
   formaPagamento?: string;
   valor?: string;
   tipo?: string;
@@ -32,6 +39,8 @@ export class TelegramBotService implements OnModuleInit {
     private readonly registrarGasto: RegistrarGasto,
     private readonly gerenciarCategorias: GerenciarCategorias,
     private readonly gerenciarFormasPagamento: GerenciarFormasPagamento,
+    private readonly gerenciarConfig: GerenciarConfig,
+    private readonly schedulerService: SchedulerService,
   ) {}
 
   async onModuleInit() {
@@ -105,29 +114,75 @@ export class TelegramBotService implements OnModuleInit {
       this.logger.warn(`⚠️ Erro ao inicializar formas de pagamento: ${msg}`);
     }
 
-    // Enviar mensagem de boas-vindas ao iniciar
+    // Configurar scheduler de resumos
     if (this.authorizedUserId) {
-      this.bot.telegram
-        .sendMessage(this.authorizedUserId, this.messageParser.getWelcomeMessage(), {
-          parse_mode: 'Markdown',
-        })
-        .catch((error) => {
-          const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      try {
+        this.schedulerService.agendarResumosDiarios(this.bot, this.authorizedUserId);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+        this.logger.warn(`⚠️ Erro ao configurar scheduler: ${msg}`);
+      }
+    }
 
-          if (msg.includes('403')) {
-            this.logger.warn(
-              `⚠️  Não foi possível enviar a mensagem de boas-vindas!\n` +
-                `📱 Por favor, siga os passos:\n` +
-                `   1. Abra o Telegram\n` +
-                `   2. Pesquise pelo nome @${this.botUsername} na lupa\n` +
-                `   3. Clique em "Desbloquear" (se estiver bloqueado)\n` +
-                `   4. Clique em "Iniciar" para começar a conversa\n` +
-                `🔄 Após fazer isso, a mensagem de boas-vindas será enviada automaticamente!`,
-            );
-          } else {
-            this.logger.warn(`⚠️ Erro ao enviar mensagem de boas-vindas: ${msg}`);
-          }
-        });
+    // Verificar config e enviar mensagem inicial apropriada
+    if (this.authorizedUserId) {
+      try {
+        const diaInicio = await this.gerenciarConfig.obterDiaInicio(this.authorizedUserId);
+
+        if (!diaInicio) {
+          // Sem config: enviar apenas mensagem de configuração
+          this.bot.telegram
+            .sendMessage(
+              this.authorizedUserId,
+              `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
+                `📅 Nenhum dia configurado\n\n` +
+                `Qual dia do mês você gostaria que seja considerado o início do seu mês?\n` +
+                `(Use um número entre 1 e 31)`,
+              {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                  keyboard: [[{ text: '❌ /cancelar' }]],
+                  one_time_keyboard: true,
+                },
+              },
+            )
+            .catch((error) => {
+              const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+              if (msg.includes('403')) {
+                this.logger.warn(
+                  `⚠️  Não foi possível enviar a mensagem de configuração!\n` +
+                    `📱 Por favor, converse com o bot primeiro no Telegram`,
+                );
+              } else {
+                this.logger.warn(`⚠️ Erro ao enviar mensagem de config: ${msg}`);
+              }
+            });
+
+          // Armazenar estado de espera por resposta
+          this.sessions.set(this.authorizedUserId, { step: 'aguardando_config_dia' });
+        } else {
+          // Com config: enviar apenas mensagem de boas-vindas
+          const menuMessage = await this.messageParser.getMenuMessage(this.authorizedUserId);
+          this.bot.telegram
+            .sendMessage(this.authorizedUserId, menuMessage, {
+              parse_mode: 'Markdown',
+            })
+            .catch((error) => {
+              const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+              if (msg.includes('403')) {
+                this.logger.warn(
+                  `⚠️  Não foi possível enviar a mensagem de boas-vindas!\n` +
+                    `📱 Por favor, converse com o bot primeiro no Telegram`,
+                );
+              } else {
+                this.logger.warn(`⚠️ Erro ao enviar mensagem de boas-vindas: ${msg}`);
+              }
+            });
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+        this.logger.warn(`⚠️ Erro ao verificar config no startup: ${msg}`);
+      }
     }
 
     process.once('SIGINT', () => {
@@ -145,12 +200,15 @@ export class TelegramBotService implements OnModuleInit {
       '📝 Registrando comandos: /menu, /ajuda, /criar, /cancelar, /relatorio, /categorias, /addcategoria, /delcategoria, /formas, /addforma, /delforma',
     );
 
-    this.bot.command('menu', (ctx) => {
-      ctx.reply(this.messageParser.getWelcomeMessage(), { parse_mode: 'Markdown' });
+    this.bot.command('menu', async (ctx) => {
+      const userId = ctx.from?.id;
+      const menuMessage = await this.messageParser.getMenuMessage(userId);
+      ctx.reply(menuMessage, { parse_mode: 'Markdown' });
     });
 
     this.bot.command('ajuda', async (ctx) => {
-      const helpMessage = await this.messageParser.getHelpMessage();
+      const userId = ctx.from?.id;
+      const helpMessage = await this.messageParser.getHelpMessage(userId);
       ctx.reply(helpMessage, { parse_mode: 'Markdown' });
     });
 
@@ -196,6 +254,10 @@ export class TelegramBotService implements OnModuleInit {
     this.bot.command('delforma', async (ctx) => {
       await this.deletarForma(ctx);
     });
+
+    this.bot.command('config', async (ctx) => {
+      await this.configurarDiaInicio(ctx);
+    });
   }
 
   private setupMessageHandlers(): void {
@@ -204,6 +266,27 @@ export class TelegramBotService implements OnModuleInit {
     this.bot.on(message('text'), async (ctx) => {
       const mensagem = ctx.message.text;
       const userId = ctx.from?.id;
+      const session = this.sessions.get(userId);
+
+      // Se está aguardando config e digitou um comando (exceto /cancelar), reenviar pergunta
+      if (session && session.step === 'aguardando_config_dia' && mensagem.startsWith('/')) {
+        if (mensagem.toLowerCase() === '/cancelar') {
+          // Processar cancelamento normalmente
+          await this.handleInteractiveFlow(ctx, mensagem, session, userId);
+        } else {
+          // Qualquer outro comando, reenviar a pergunta de config
+          ctx.reply(
+            `⚙️ *Configuração do mês*\n\n` +
+              `📅 Nenhum dia configurado\n\n` +
+              `Qual dia do mês você gostaria que seja considerado o início do seu mês?\n` +
+              `(Use um número entre 1 e 31)`,
+            { parse_mode: 'Markdown' },
+          );
+        }
+        return;
+      }
+
+      // Comandos normais (não em estado aguardando_config_dia) são ignorados aqui
       if (mensagem.startsWith('/')) {
         return;
       }
@@ -214,8 +297,6 @@ export class TelegramBotService implements OnModuleInit {
         return;
       }
 
-      const session = this.sessions.get(userId);
-
       if (session) {
         this.logger.debug(`Processando fluxo interativo para ${userId}`);
         await this.handleInteractiveFlow(ctx, mensagem, session, userId);
@@ -224,6 +305,23 @@ export class TelegramBotService implements OnModuleInit {
 
       this.logger.debug(`Processando mensagem direta de ${userId}`);
       await this.handleDirectMessage(ctx, mensagem);
+    });
+
+    // Handler para botões inline (callback)
+    this.bot.on('callback_query', async (ctx) => {
+      const callbackData = (ctx.callbackQuery as any)?.data;
+      const userId = ctx.from?.id;
+
+      if (!userId) {
+        return;
+      }
+
+      if (callbackData === 'adicionar_gasto') {
+        await this.startInteractiveFlow(ctx);
+      }
+
+      // Responder ao callback para remover "loading" do botão
+      await ctx.answerCbQuery();
     });
   }
 
@@ -349,12 +447,69 @@ export class TelegramBotService implements OnModuleInit {
             },
           );
           break;
+
+        case 'aguardando_config_dia':
+          // Suporte para cancelamento
+          if (mensagem.toLowerCase() === '/cancelar') {
+            this.sessions.delete(userId);
+            const menuMessage = await this.messageParser.getMenuMessage(userId);
+            ctx.reply(menuMessage, {
+              parse_mode: 'Markdown',
+              reply_markup: { remove_keyboard: true },
+            });
+            return;
+          }
+
+          // Se a mensagem parece um gasto (contém vírgula), processa como gasto
+          if (mensagem.includes(',')) {
+            this.sessions.delete(userId);
+            this.logger.debug(
+              `Usuário ${userId} enviou gasto durante config, processando como gasto`,
+            );
+            await this.handleDirectMessage(ctx, mensagem);
+            return;
+          }
+
+          const dia = parseInt(mensagem.trim(), 10);
+
+          if (isNaN(dia) || dia < 1 || dia > 31) {
+            ctx.reply(
+              `👋 *Olá! Bem-vindo ao Registro de Gastos!*\n\n` +
+                `📅 Nenhum dia configurado\n\n` +
+                `Qual dia do mês você gostaria que seja considerado o início do seu mês?\n` +
+                `(Use um número entre 1 e 31) ou /cancelar para deixar para depois`,
+              { parse_mode: 'Markdown' },
+            );
+            return;
+          }
+
+          await this.gerenciarConfig.salvarDiaInicio(userId, dia);
+          this.sessions.delete(userId);
+
+          // Agendar resumos
+          this.schedulerService.agendarResumosDiarios(this.bot, userId);
+
+          ctx.reply(
+            `✅ *Configuração salva!*\n\n` + `📅 Seu mês começará no dia ${dia} de cada mês\n`,
+            {
+              parse_mode: 'Markdown',
+              reply_markup: { remove_keyboard: true },
+            },
+          );
+
+          // Enviar mensagem de boas-vindas após configurar
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          const menuMessage = await this.messageParser.getMenuMessage(userId);
+          ctx.reply(menuMessage, {
+            parse_mode: 'Markdown',
+          });
+          break;
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error('Erro no fluxo interativo:', error);
       this.sessions.delete(userId);
-      ctx.reply(`❌ Erro: ${msg}\n\nTente novamente com /criar`, {
+      ctx.reply(`❌ Erro: ${msg}\n\nTente novamente`, {
         reply_markup: { remove_keyboard: true },
       });
     }
@@ -569,6 +724,32 @@ export class TelegramBotService implements OnModuleInit {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error('Erro ao deletar forma de pagamento:', error);
+      ctx.reply(`❌ ${msg}`);
+    }
+  }
+
+  private async configurarDiaInicio(ctx: Context): Promise<void> {
+    try {
+      const userId = ctx.from?.id;
+      if (!userId) {
+        ctx.reply('❌ Erro ao identificar usuário');
+        return;
+      }
+
+      const diaAtual = await this.gerenciarConfig.obterDiaInicio(userId);
+      const mensagem =
+        `⚙️ *Configuração do mês*\n\n` +
+        `${diaAtual ? `📅 Dia atual: ${diaAtual}` : '📅 Nenhum dia configurado'}\n\n` +
+        `Qual dia do mês você gostaria que seja considerado o início do seu mês?\n` +
+        `(Use um número entre 1 e 31)`;
+
+      // Armazenar que usuário está no fluxo de config
+      this.sessions.set(userId, { step: 'aguardando_config_dia' });
+
+      ctx.reply(mensagem);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      this.logger.error('Erro ao configurar dia de início:', error);
       ctx.reply(`❌ ${msg}`);
     }
   }
