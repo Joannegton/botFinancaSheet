@@ -76,6 +76,18 @@ export class TelegramBotService implements OnModuleInit {
     this.logger.log('✨ Bot do Telegram iniciado com sucesso!');
     this.logger.log('📡 Aguardando mensagens em modo polling...');
 
+    // Enviar mensagem de boas-vindas ao iniciar
+    if (this.authorizedUserId) {
+      this.bot.telegram
+        .sendMessage(this.authorizedUserId, this.getWelcomeMessage(), {
+          parse_mode: 'Markdown',
+        })
+        .catch((error) => {
+          const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+          this.logger.warn(`⚠️ Não foi possível enviar mensagem de boas-vindas: ${msg}`);
+        });
+    }
+
     process.once('SIGINT', () => {
       this.logger.log('⛔ Parando bot (SIGINT)...');
       this.bot.stop('SIGINT');
@@ -90,16 +102,7 @@ export class TelegramBotService implements OnModuleInit {
     this.logger.log('📝 Registrando comandos: /start, /ajuda, /menu, /cancelar, /relatorio');
 
     this.bot.command('start', (ctx) => {
-      ctx.reply(
-        `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
-          `Você pode registrar gastos de duas formas:\n\n` +
-          `1️⃣ *Mensagem direta:*\n` +
-          `\`cartao - 35 - comida - almoço\`\n\n` +
-          `2️⃣ *Menu interativo:*\n` +
-          `Digite /menu\n\n` +
-          `Digite /ajuda para ver todos os comandos.`,
-        { parse_mode: 'Markdown' },
-      );
+      ctx.reply(this.getWelcomeMessage(), { parse_mode: 'Markdown' });
     });
 
     this.bot.command('ajuda', (ctx) => {
@@ -355,5 +358,17 @@ export class TelegramBotService implements OnModuleInit {
     }
 
     throw new Error('Tipo de gasto não reconhecido');
+  }
+
+  private getWelcomeMessage(): string {
+    return (
+      `👋 Olá! Bem-vindo ao *Registro de Gastos*!\n\n` +
+      `Você pode registrar gastos de duas formas:\n\n` +
+      `1️⃣ *Mensagem direta:*\n` +
+      `\`cartao - 35 - comida - almoço\`\n\n` +
+      `2️⃣ *Menu interativo:*\n` +
+      `Digite /menu\n\n` +
+      `Digite /ajuda para ver todos os comandos.`
+    );
   }
 }
