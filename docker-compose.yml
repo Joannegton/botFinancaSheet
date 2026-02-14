@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 services:
   app:
@@ -8,20 +8,23 @@ services:
     container_name: registro-gastos-bot
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/service-account.json
     volumes:
+      # Credenciais Google (read-only para segurança)
+      - ./config/service-account.json:/app/config/service-account.json:ro
       - ./logs:/app/logs
     networks:
       - app-network
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   app-network:

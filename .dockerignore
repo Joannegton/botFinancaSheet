@@ -12,3 +12,18 @@ README.md
 .vscode
 coverage
 .nyc_output
+
+# Credentials (montadas via volume)
+config/
+credentials.json
+*.pem
+*.key
+
+# Documentation
+FUNCIONALIDADES.md
+DEPLOYMENT.md
+QUICK_START.md
+SETUP_GOOGLE_SHEETS.md
+
+# Logs (montados via volume)
+logs/

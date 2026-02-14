@@ -8,6 +8,8 @@ Para ver a documentação completa de todas as funcionalidades do sistema, acess
 
 📖 **[FUNCIONALIDADES.md](./FUNCIONALIDADES.md)** - Documentação detalhada com exemplos e casos de uso
 
+---
+
 ## 📋 Pré-requisitos
 
 ### 1. Criar Bot no Telegram
@@ -23,55 +25,30 @@ Para ver a documentação completa de todas as funcionalidades do sistema, acess
 
 ### 2. Configurar Google Sheets
 
-#### 2.1. Criar Service Account
-
-1. Acesse [Google Cloud Console](https://console.cloud.google.com/)
-2. Crie um novo projeto ou selecione um existente
-3. Vá em **APIs & Services** → **Credentials**
-4. Clique em **Create Credentials** → **Service Account**
-5. Preencha os dados e clique em **Create**
-6. Clique na service account criada
-7. Vá em **Keys** → **Add Key** → **Create new key**
-8. Escolha **JSON** e faça o download
-9. [Documentação oficial](https://developers.google.com/workspace/guides/create-credentials?hl=pt-br#service-account)
-
-#### 2.2. Ativar Google Sheets API
-
-1. No Google Cloud Console, vá em **APIs & Services** → **Library**
-2. Procure por "Google Sheets API"
-3. Clique em **Enable**
-
-#### 2.3. Criar e Compartilhar Planilha
-
-1. Crie uma nova planilha no [Google Sheets](https://sheets.google.com)
-2. Copie o **ID da planilha** da URL:
-   ```
-   https://docs.google.com/spreadsheets/d/SEU_ID_AQUI/edit
-   ```
-3. Clique em **Compartilhar**
-4. Cole o email da service account (está no JSON baixado)
-5. Dê permissão de **Editor**
+- Siga os passos indicados em [configurando google sheets](./SETUP_GOOGLE_SHEETS.md)
 
 ## 🚀 Instalação
 
-### Opção 1: Docker (Recomendado)
+### Docker
 
 ```bash
-# Clone o repositório
-cd botFinancaSheet
+# 1. Copie seu arquivo baixado para a pasta config
+cp /caminho/para/seu/credentials.json config/service-account.json
 
-# Copie o arquivo de exemplo
+# 2. Copie o arquivo .env de exemplo
 cp .env.example .env
 
-# Edite o .env com suas credenciais
+# 3. Edite o .env com suas credenciais do Telegram
 nano .env
 
-# Inicie com Docker Compose
-docker-compose up -d
+# 4. Inicie com Docker Compose
+docker-compose up -d --build
 
-# Veja os logs
+# 5. Veja os logs
 docker-compose logs -f
 ```
+
+📖 **Para deploy em servidor ou configuração avançada, veja [DEPLOYMENT.md](./DEPLOYMENT.md)**
 
 ## ⚙️ Configuração (.env)
 
@@ -84,7 +61,8 @@ TELEGRAM_USER_ID=123456789
 TELEGRAM_WEBHOOK_SECRET=seu_secret_aleatorio_aqui
 
 # Google Sheets Configuration
-GOOGLE_APPLICATION_CREDENTIALS=./credentials.json
+# Path DENTRO do container (não altere)
+GOOGLE_APPLICATION_CREDENTIALS=/app/config/service-account.json
 GOOGLE_SHEETS_SPREADSHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
 GOOGLE_SHEETS_SHEET_NAME=Gastos
 
@@ -92,21 +70,6 @@ GOOGLE_SHEETS_SHEET_NAME=Gastos
 NODE_ENV=production
 PORT=3000
 ```
-
-### Configuração de Credenciais do Google
-
-O arquivo `credentials.json` é necessário para autenticar com o Google Sheets:
-
-1. **Baixe as credenciais** no [Google Cloud Console](https://console.cloud.google.com/)
-2. **Copie o conteúdo** do arquivo JSON para `credentials.json` na raiz do projeto
-3. **Não faça commit** desse arquivo (está no `.gitignore`)
-
-Veja [SETUP_GOOGLE_SHEETS.md](./SETUP_GOOGLE_SHEETS.md) para instruções detalhadas.
-
-### Como obter a Private Key do JSON:
-
-Abra o arquivo JSON baixado da service account e procure por `private_key`.
-Copie o valor incluindo as aspas e quebras de linha (`\n`).
 
 ## 🛠️ Stack Tecnológica
 

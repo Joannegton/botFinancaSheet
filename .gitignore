@@ -42,3 +42,6 @@ lerna-debug.log*
 # Credentials
 credentials.json
 google-credentials.json
+config/service-account.json
+*.pem
+*.key

@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, sheets_v4 } from 'googleapis';
-import * as path from 'path';
 import * as fs from 'fs/promises';
 import { IFormasPagamentoRepository } from '@domain/repositories/IFormasPagamentoRepository';
 
@@ -14,7 +13,7 @@ export class FormasPagamentoGoogleSheetsRepository
   private spreadsheetId!: string;
   private sheetName = 'FormasPagamento';
   private sheetId!: number;
-  private readonly CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+  private readonly CREDENTIALS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS as string;
 
   constructor(private readonly configService: ConfigService) {}
 
