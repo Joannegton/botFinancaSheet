@@ -1,6 +1,36 @@
 version: '3.9'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stack: NestJS (bot financeiro) + PostgreSQL
+# WhatsApp via Twilio API (não requer serviço local)
+#
+# Suba tudo com:  docker compose up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
+
+  # ── PostgreSQL (banco de dados) ────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-bot_financa}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── NestJS (bot financeiro) ────────────────────────────────────────────────
   app:
     build:
       context: .
@@ -13,11 +43,16 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/service-account.json
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-bot_financa}
     volumes:
-      # Credenciais Google (read-only para segurança)
-      - ./config/service-account.json:/app/config/service-account.json:ro
       - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - app-network
     logging:
@@ -25,6 +60,9 @@ services:
       options:
         max-size: '10m'
         max-file: '3'
+
+volumes:
+  postgres_data:
 
 networks:
   app-network:

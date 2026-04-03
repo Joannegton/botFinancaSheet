@@ -84,7 +84,7 @@ export class MessageParser {
     return partes.length >= 3;
   }
 
-  async getMenuMessage(userId?: number): Promise<string> {
+  async getMenuMessage(userId?: string): Promise<string> {
     let configText = `/config - Configurar dados`;
     let tituloTexto = '👋 Olá! Bem-vindo ao *Registro de Gastos*!';
 
@@ -124,15 +124,15 @@ export class MessageParser {
       `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
       `\`Ex: cartão nubank, 35, moradia, aluguel\`\n\n` +
       `2️⃣ *Modo interativo:*\n` +
-      `Digite /criar\n\n` +
+      `Digite *criar*\n\n` +
       `📝 *Conheça o funcionamento:*\n` +
-      `/ajuda - Ver ajuda completa e todas as funcionalidades\n` +
-      `/documentacao - Acessar documentação web completa\n` +
+      `*ajuda* - Ver ajuda completa e todas as funcionalidades\n` +
+      `*relatorio* - Ver seus gastos do período\n` +
       `${configText}`
     );
   }
 
-  async getHelpMessage(userId?: number): Promise<string> {
+  async getHelpMessage(userId?: string): Promise<string> {
     const formas = await this.gerenciarFormasPagamento.buscarTodas();
     const categorias = await this.gerenciarCategorias.buscarTodas();
 
@@ -144,7 +144,7 @@ export class MessageParser {
     if (userId) {
       const diaInicio = await this.gerenciarConfig.obterDiaInicio(userId);
       if (diaInicio === null) {
-        avisoConfig = `⚠️ *Atenção:* Você ainda não configurou o seu mês!\nUse /config para definir o dia de início do seu mês.\n\n`;
+        avisoConfig = `⚠️ *Atenção:* Você ainda não configurou o seu mês!\nEnvie *config* para definir o dia de início do seu mês.\n\n`;
       }
     }
 
@@ -165,27 +165,26 @@ ${formasFormatadas}
 ${categoriasFormatadas}
 
 🔧 *Comandos de registro:*
-/criar - Modo interativo para registrar gasto
-/cancelar - Cancelar operação atual
+*criar* - Modo interativo para registrar gasto
+*cancelar* - Cancelar operação atual
 
 📊 *Comandos de consulta:*
-/menu - Inicio
-/ajuda - Ver este guia completo
-/documentacao - Acessar documentação web completa
-/relatorio - Ver últimos gastos
+*menu* - Início
+*ajuda* - Ver este guia completo
+*relatorio* - Ver gastos do período
 
 📂 *Gerenciar categorias:*
-/categorias - Ver todas as categorias
-/addcategoria [nome] - Adicionar nova categoria
-/delcategoria [número] - Remover categoria por posição
+*categorias* - Ver todas as categorias
+*addcategoria [nome]* - Adicionar nova categoria
+*delcategoria [número]* - Remover categoria por posição
 
 💳 *Gerenciar formas de pagamento:*
-/formas - Ver todas as formas de pagamento
-/addforma [nome] - Adicionar nova forma de pagamento
-/delforma [número] - Remover forma de pagamento por posição
+*formas* - Ver todas as formas de pagamento
+*addforma [nome]* - Adicionar nova forma de pagamento
+*delforma [número]* - Remover forma de pagamento por posição
 
-️⚙ *Configuração:*
-/config - Configurar dados`.trim();
+⚙️ *Configuração:*
+*config* - Configurar dia de início do mês`.trim();
   }
   //TODO ajustar link da documentacao em producao
   async getDocumentacaoMessage(): Promise<string> {

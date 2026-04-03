@@ -1,5 +1,5 @@
 export interface IConfigRepository {
-  salvarConfig(userId: number, diaInicio: number): Promise<void>;
-  obterConfig(userId: number): Promise<number | null>;
-  atualizarConfig(userId: number, diaInicio: number): Promise<void>;
+  salvarConfig(userId: string, diaInicio: number): Promise<void>;
+  obterConfig(userId: string): Promise<number | null>;
+  atualizarConfig(userId: string, diaInicio: number): Promise<void>;
 }

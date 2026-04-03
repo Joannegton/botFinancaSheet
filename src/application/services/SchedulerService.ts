@@ -1,13 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as cron from 'node-cron';
-import { Telegraf } from 'telegraf';
 import { RegistrarGasto } from '@application/use-cases/RegistrarGasto';
 import { GerenciarConfig } from '@application/use-cases/GerenciarConfig';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SchedulerService.name);
-  private tasks: Map<number, cron.ScheduledTask> = new Map();
+  private readonly tasks: Map<string, cron.ScheduledTask> = new Map();
 
   constructor(
     private readonly registrarGasto: RegistrarGasto,
@@ -18,7 +17,7 @@ export class SchedulerService implements OnModuleInit {
     this.logger.log('📅 Scheduler inicializado');
   }
 
-  agendarResumosDiarios(bot: Telegraf, userId: number): void {
+  agendarResumosDiarios(userId: string, sendMessage: (text: string) => Promise<void>): void {
     // Remover tarefa anterior se existir
     const tarefaAnterior = this.tasks.get(userId);
     if (tarefaAnterior) {
@@ -28,7 +27,7 @@ export class SchedulerService implements OnModuleInit {
 
     const tarefa = cron.schedule('0 0 21 * * *', async () => {
       try {
-        await this.enviarResumo(bot, userId);
+        await this.enviarResumo(userId, sendMessage);
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Erro desconhecido';
         this.logger.error(`Erro ao enviar resumo para userId=${userId}: ${msg}`);
@@ -39,7 +38,7 @@ export class SchedulerService implements OnModuleInit {
     this.logger.log(`⏰ Resumo diário agendado para às 21:00`);
   }
 
-  private async enviarResumo(bot: Telegraf, userId: number): Promise<void> {
+  private async enviarResumo(userId: string, sendMessage: (text: string) => Promise<void>): Promise<void> {
     try {
       const diaInicio = await this.gerenciarConfig.obterDiaInicio(userId);
       const gastos = await this.registrarGasto.buscarTodos();
@@ -78,21 +77,9 @@ export class SchedulerService implements OnModuleInit {
         mensagem += `\n${resumoMensal}`;
       }
 
-      mensagem += `\n\n❓ *Tem gastos que vc se esqueceu de adicionar?*`;
+      mensagem += `\n\n❓ *Tem gastos que você se esqueceu de adicionar?*\nResponda *criar* para registrar um agora.`;
 
-      await bot.telegram.sendMessage(userId, mensagem, {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: 'Sim, adicionar gasto',
-                callback_data: 'adicionar_gasto',
-              },
-            ],
-          ],
-        },
-      });
+      await sendMessage(mensagem);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       this.logger.error(`Erro ao enviar resumo: ${msg}`);
@@ -107,26 +94,7 @@ export class SchedulerService implements OnModuleInit {
       let dataFim: Date;
       let periodo: string;
 
-      if (diaInicio !== null) {
-        // Com dia configurado: calcular período mensal
-        const anoAtual = hoje.getFullYear();
-        const mesAtual = hoje.getMonth();
-        const diaAtual = hoje.getDate();
-
-        if (diaAtual >= diaInicio) {
-          dataInicio = new Date(anoAtual, mesAtual, diaInicio);
-          dataFim = new Date(anoAtual, mesAtual + 1, diaInicio);
-        } else {
-          dataInicio = new Date(anoAtual, mesAtual - 1, diaInicio);
-          dataFim = new Date(anoAtual, mesAtual, diaInicio);
-        }
-
-        const mesInicioDisplay = String(dataInicio.getMonth() + 1).padStart(2, '0');
-        const mesFimDisplay = String(dataFim.getMonth() + 1).padStart(2, '0');
-        const diaInicioDisplay = String(diaInicio).padStart(2, '0');
-
-        periodo = `${diaInicioDisplay}/${mesInicioDisplay} até ${diaInicioDisplay}/${mesFimDisplay}`;
-      } else {
+      if (diaInicio === null) {
         // Sem dia configurado: usar últimos 30 dias
         dataFim = new Date(hoje);
         dataInicio = new Date(hoje);
@@ -146,6 +114,25 @@ export class SchedulerService implements OnModuleInit {
           dataFim.getFullYear();
 
         periodo = `últimos 30 dias (${dataInicioFormatada} até ${dataFimFormatada})`;
+      } else {
+        // Com dia configurado: calcular período mensal
+        const anoAtual = hoje.getFullYear();
+        const mesAtual = hoje.getMonth();
+        const diaAtual = hoje.getDate();
+
+        if (diaAtual >= diaInicio) {
+          dataInicio = new Date(anoAtual, mesAtual, diaInicio);
+          dataFim = new Date(anoAtual, mesAtual + 1, diaInicio);
+        } else {
+          dataInicio = new Date(anoAtual, mesAtual - 1, diaInicio);
+          dataFim = new Date(anoAtual, mesAtual, diaInicio);
+        }
+
+        const mesInicioDisplay = String(dataInicio.getMonth() + 1).padStart(2, '0');
+        const mesFimDisplay = String(dataFim.getMonth() + 1).padStart(2, '0');
+        const diaInicioDisplay = String(diaInicio).padStart(2, '0');
+
+        periodo = `${diaInicioDisplay}/${mesInicioDisplay} até ${diaInicioDisplay}/${mesFimDisplay}`;
       }
 
       const gastosPeríodo = gastos.filter((g) => {
@@ -158,11 +145,12 @@ export class SchedulerService implements OnModuleInit {
 
       return `📅 *Resumo do período (${periodo})*\n💰 Total: R$ ${totalMensal.toFixed(2)}\n`;
     } catch (error) {
+      this.logger.warn(`Erro ao calcular resumo mensal: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       return '';
     }
   }
 
-  pararResumo(userId: number): void {
+  pararResumo(userId: string): void {
     const tarefa = this.tasks.get(userId);
     if (tarefa) {
       tarefa.stop();

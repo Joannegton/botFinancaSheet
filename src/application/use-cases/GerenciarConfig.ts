@@ -10,7 +10,7 @@ export class GerenciarConfig {
     private readonly configRepository: IConfigRepository,
   ) {}
 
-  async salvarDiaInicio(userId: number, diaInicio: number): Promise<void> {
+  async salvarDiaInicio(userId: string, diaInicio: number): Promise<void> {
     if (diaInicio < 1 || diaInicio > 31) {
       throw new Error('Dia inválido. Use um número entre 1 e 31');
     }
@@ -18,11 +18,11 @@ export class GerenciarConfig {
     await this.configRepository.salvarConfig(userId, diaInicio);
   }
 
-  async obterDiaInicio(userId: number): Promise<number | null> {
+  async obterDiaInicio(userId: string): Promise<number | null> {
     return this.configRepository.obterConfig(userId);
   }
 
-  async atualizarDiaInicio(userId: number, diaInicio: number): Promise<void> {
+  async atualizarDiaInicio(userId: string, diaInicio: number): Promise<void> {
     if (diaInicio < 1 || diaInicio > 31) {
       throw new Error('Dia inválido. Use um número entre 1 e 31');
     }
