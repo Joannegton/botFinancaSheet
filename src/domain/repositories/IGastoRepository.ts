@@ -1,6 +1,6 @@
 import { Gasto } from '@domain/entities/Gasto';
 
 export interface IGastoRepository {
-  salvar(gasto: Gasto): Promise<void>;
-  buscarTodos(): Promise<Gasto[]>;
+  salvar(userId: string, gasto: Gasto): Promise<void>;
+  buscarTodos(userId: string): Promise<Gasto[]>;
 }

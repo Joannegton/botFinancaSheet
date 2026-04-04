@@ -1,9 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('gastos')
+@Index(['userId'])
+@Index(['userId', 'dataHora'])
 export class GastoEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  userId: string; // Número do WhatsApp (references UsuarioEntity)
 
   @Column({ type: 'timestamp with time zone' })
   dataHora: Date;

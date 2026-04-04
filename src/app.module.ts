@@ -8,15 +8,18 @@ import { GastoRepository } from '@infrastructure/database/repositories/GastoRepo
 import { CategoriasRepository } from '@infrastructure/database/repositories/CategoriasRepository';
 import { FormasPagamentoRepository } from '@infrastructure/database/repositories/FormasPagamentoRepository';
 import { ConfigRepository } from '@infrastructure/database/repositories/ConfigRepository';
+import { UsuarioRepository } from '@infrastructure/database/repositories/UsuarioRepository';
 import { GastoEntity } from '@infrastructure/database/entities/GastoEntity';
 import { CategoriaEntity } from '@infrastructure/database/entities/CategoriaEntity';
 import { FormaPagamentoEntity } from '@infrastructure/database/entities/FormaPagamentoEntity';
 import { ConfigEntity } from '@infrastructure/database/entities/ConfigEntity';
+import { UsuarioEntity } from '@infrastructure/database/entities/UsuarioEntity';
 import { MessageParser } from '@application/parsers/MessageParser';
 import { RegistrarGasto } from '@application/use-cases/RegistrarGasto';
 import { GerenciarCategorias } from '@application/use-cases/GerenciarCategorias';
 import { GerenciarFormasPagamento } from '@application/use-cases/GerenciarFormasPagamento';
 import { GerenciarConfig } from '@application/use-cases/GerenciarConfig';
+import { RegistrarUsuario } from '@application/use-cases/RegistrarUsuario';
 import { SchedulerService } from '@application/services/SchedulerService';
 import { DocumentacaoController } from './app/documentacao.controller';
 
@@ -33,11 +36,17 @@ import { DocumentacaoController } from './app/documentacao.controller';
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'bot_financa',
-      entities: [GastoEntity, CategoriaEntity, FormaPagamentoEntity, ConfigEntity],
+      entities: [GastoEntity, CategoriaEntity, FormaPagamentoEntity, ConfigEntity, UsuarioEntity],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV !== 'production',
     }),
-    TypeOrmModule.forFeature([GastoEntity, CategoriaEntity, FormaPagamentoEntity, ConfigEntity]),
+    TypeOrmModule.forFeature([
+      GastoEntity,
+      CategoriaEntity,
+      FormaPagamentoEntity,
+      ConfigEntity,
+      UsuarioEntity,
+    ]),
   ],
   controllers: [HealthController, DocumentacaoController, WhatsAppWebhookController],
   providers: [
@@ -57,11 +66,16 @@ import { DocumentacaoController } from './app/documentacao.controller';
       provide: 'IConfigRepository',
       useClass: ConfigRepository,
     },
+    {
+      provide: 'IUsuarioRepository',
+      useClass: UsuarioRepository,
+    },
     WhatsAppBotService,
     RegistrarGasto,
     GerenciarCategorias,
     GerenciarFormasPagamento,
     GerenciarConfig,
+    RegistrarUsuario,
     SchedulerService,
     MessageParser,
   ],

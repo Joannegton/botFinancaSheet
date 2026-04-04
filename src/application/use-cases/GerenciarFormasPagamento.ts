@@ -11,11 +11,11 @@ export class GerenciarFormasPagamento {
     private readonly formasPagamentoRepository: IFormasPagamentoRepository,
   ) {}
 
-  async buscarTodas(): Promise<string[]> {
-    return this.formasPagamentoRepository.buscarTodas();
+  async buscarTodas(userId: string): Promise<string[]> {
+    return this.formasPagamentoRepository.buscarTodas(userId);
   }
 
-  async adicionarForma(forma: string): Promise<string> {
+  async adicionarForma(userId: string, forma: string): Promise<string> {
     const formaFormatada = forma.toLowerCase().trim();
 
     if (!formaFormatada) {
@@ -31,32 +31,31 @@ export class GerenciarFormasPagamento {
       throw new Error('Forma de pagamento contém caracteres inválidos');
     }
 
-    const formas = await this.formasPagamentoRepository.buscarTodas();
+    const formas = await this.formasPagamentoRepository.buscarTodas(userId);
 
     if (formas.includes(formaFormatada)) {
       throw new Error('Essa forma de pagamento já existe');
     }
 
-    await this.formasPagamentoRepository.salvar(formaFormatada);
+    await this.formasPagamentoRepository.salvar(userId, formaFormatada);
     this.logger.log(`✅ Forma de pagamento adicionada: ${formaFormatada}`);
 
     return formaFormatada;
   }
 
-  async inicializarFormasIfNeeded(): Promise<void> {
-    const formas = await this.formasPagamentoRepository.buscarTodas();
+  async inicializarFormasIfNeeded(userId: string): Promise<void> {
+    const formas = await this.formasPagamentoRepository.buscarTodas(userId);
 
     if (formas.length === 0) {
-      this.logger.log('Inicializando formas de pagamento padrão...');
+      this.logger.debug('Inicializando formas de pagamento padrão para ' + userId);
       for (const forma of this.FORMAS_PADRAO) {
-        await this.formasPagamentoRepository.salvar(forma);
+        await this.formasPagamentoRepository.salvar(userId, forma);
       }
-      this.logger.log('✅ Formas de pagamento padrão inicializadas');
     }
   }
 
-  async deletarFormaPorIndice(indice: number): Promise<string> {
-    const formas = await this.formasPagamentoRepository.buscarTodas();
+  async deletarFormaPorIndice(userId: string, indice: number): Promise<string> {
+    const formas = await this.formasPagamentoRepository.buscarTodas(userId);
 
     if (indice < 1 || indice > formas.length) {
       throw new Error(`Índice inválido. Use um número entre 1 e ${formas.length}`);
@@ -65,7 +64,7 @@ export class GerenciarFormasPagamento {
     const formaRemovida = formas[indice - 1];
     const novasFormas = formas.filter((_, i) => i !== indice - 1);
 
-    await this.formasPagamentoRepository.salvarTodas(novasFormas);
+    await this.formasPagamentoRepository.salvarTodas(userId, novasFormas);
     this.logger.log(`✅ Forma de pagamento removida: ${formaRemovida}`);
 
     return formaRemovida;

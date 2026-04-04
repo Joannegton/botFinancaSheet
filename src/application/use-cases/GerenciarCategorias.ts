@@ -11,11 +11,11 @@ export class GerenciarCategorias {
     private readonly categoriasRepository: ICategoriasRepository,
   ) {}
 
-  async buscarTodas(): Promise<string[]> {
-    return this.categoriasRepository.buscarTodas();
+  async buscarTodas(userId: string): Promise<string[]> {
+    return this.categoriasRepository.buscarTodas(userId);
   }
 
-  async adicionarCategoria(categoria: string): Promise<string> {
+  async adicionarCategoria(userId: string, categoria: string): Promise<string> {
     const categoriaFormatada = categoria.toLowerCase().trim();
 
     if (!categoriaFormatada) {
@@ -31,32 +31,31 @@ export class GerenciarCategorias {
       throw new Error('Categoria contém caracteres inválidos');
     }
 
-    const categorias = await this.categoriasRepository.buscarTodas();
+    const categorias = await this.categoriasRepository.buscarTodas(userId);
 
     if (categorias.includes(categoriaFormatada)) {
       throw new Error('Essa categoria já existe');
     }
 
-    await this.categoriasRepository.salvar(categoriaFormatada);
+    await this.categoriasRepository.salvar(userId, categoriaFormatada);
     this.logger.log(`✅ Categoria adicionada: ${categoriaFormatada}`);
 
     return categoriaFormatada;
   }
 
-  async inicializarCategoriasIfNeeded(): Promise<void> {
-    const categorias = await this.categoriasRepository.buscarTodas();
+  async inicializarCategoriasIfNeeded(userId: string): Promise<void> {
+    const categorias = await this.categoriasRepository.buscarTodas(userId);
 
     if (categorias.length === 0) {
-      this.logger.log('Inicializando categorias padrão...');
+      this.logger.debug('Inicializando categorias padrão para ' + userId);
       for (const cat of this.CATEGORIAS_PADRAO) {
-        await this.categoriasRepository.salvar(cat);
+        await this.categoriasRepository.salvar(userId, cat);
       }
-      this.logger.log('✅ Categorias padrão inicializadas');
     }
   }
 
-  async deletarCategoriaPorIndice(indice: number): Promise<string> {
-    const categorias = await this.categoriasRepository.buscarTodas();
+  async deletarCategoriaPorIndice(userId: string, indice: number): Promise<string> {
+    const categorias = await this.categoriasRepository.buscarTodas(userId);
 
     if (indice < 1 || indice > categorias.length) {
       throw new Error(`Índice inválido. Use um número entre 1 e ${categorias.length}`);
@@ -65,7 +64,7 @@ export class GerenciarCategorias {
     const categoriaRemovida = categorias[indice - 1];
     const novasCategorias = categorias.filter((_, i) => i !== indice - 1);
 
-    await this.categoriasRepository.salvarTodas(novasCategorias);
+    await this.categoriasRepository.salvarTodas(userId, novasCategorias);
     this.logger.log(`✅ Categoria removida: ${categoriaRemovida}`);
 
     return categoriaRemovida;

@@ -15,8 +15,9 @@ export class GastoRepository implements IGastoRepository {
     private readonly gastoRepository: Repository<GastoEntity>,
   ) {}
 
-  async salvar(gasto: Gasto): Promise<void> {
+  async salvar(userId: string, gasto: Gasto): Promise<void> {
     const gastoEntity = this.gastoRepository.create({
+      userId,
       dataHora: gasto.dataHora,
       formaPagamento: gasto.formaPagamento.toString(),
       tipo: gasto.tipo.toString(),
@@ -27,8 +28,9 @@ export class GastoRepository implements IGastoRepository {
     await this.gastoRepository.save(gastoEntity);
   }
 
-  async buscarTodos(): Promise<Gasto[]> {
+  async buscarTodos(userId: string): Promise<Gasto[]> {
     const gastos = await this.gastoRepository.find({
+      where: { userId },
       order: { dataHora: 'DESC' },
     });
 

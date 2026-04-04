@@ -1,6 +1,6 @@
 export interface ICategoriasRepository {
-  salvar(categoria: string): Promise<void>;
-  salvarTodas(categorias: string[]): Promise<void>;
-  buscarTodas(): Promise<string[]>;
-  existe(categoria: string): Promise<boolean>;
+  salvar(userId: string, categoria: string): Promise<void>;
+  salvarTodas(userId: string, categorias: string[]): Promise<void>;
+  buscarTodas(userId: string): Promise<string[]>;
+  existe(userId: string, categoria: string): Promise<boolean>;
 }

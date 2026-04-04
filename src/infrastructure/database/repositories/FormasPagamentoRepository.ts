@@ -11,28 +11,28 @@ export class FormasPagamentoRepository implements IFormasPagamentoRepository {
     private readonly formaPagamentoRepository: Repository<FormaPagamentoEntity>,
   ) {}
 
-  async salvar(forma: string): Promise<void> {
-    const existe = await this.formaPagamentoRepository.findOneBy({ nome: forma });
+  async salvar(userId: string, forma: string): Promise<void> {
+    const existe = await this.formaPagamentoRepository.findOneBy({ userId, nome: forma });
 
     if (!existe) {
-      const fp = this.formaPagamentoRepository.create({ nome: forma });
+      const fp = this.formaPagamentoRepository.create({ userId, nome: forma });
       await this.formaPagamentoRepository.save(fp);
     }
   }
 
-  async salvarTodas(formas: string[]): Promise<void> {
+  async salvarTodas(userId: string, formas: string[]): Promise<void> {
     for (const forma of formas) {
-      await this.salvar(forma);
+      await this.salvar(userId, forma);
     }
   }
 
-  async buscarTodas(): Promise<string[]> {
-    const formas = await this.formaPagamentoRepository.find();
+  async buscarTodas(userId: string): Promise<string[]> {
+    const formas = await this.formaPagamentoRepository.find({ where: { userId } });
     return formas.map((f) => f.nome);
   }
 
-  async existe(forma: string): Promise<boolean> {
-    const existe = await this.formaPagamentoRepository.findOneBy({ nome: forma });
+  async existe(userId: string, forma: string): Promise<boolean> {
+    const existe = await this.formaPagamentoRepository.findOneBy({ userId, nome: forma });
     return !!existe;
   }
 }

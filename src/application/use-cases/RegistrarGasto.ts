@@ -9,27 +9,27 @@ export class RegistrarGasto {
     private readonly gastoRepository: IGastoRepository,
   ) {}
 
-  async execute(gasto: Gasto): Promise<void> {
+  async execute(userId: string, gasto: Gasto): Promise<void> {
     try {
-      await this.gastoRepository.salvar(gasto);
+      await this.gastoRepository.salvar(userId, gasto);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       throw new Error(`Erro ao registrar gasto: ${msg}`);
     }
   }
 
-  async buscarTodos(): Promise<Gasto[]> {
+  async buscarTodos(userId: string): Promise<Gasto[]> {
     try {
-      return await this.gastoRepository.buscarTodos();
+      return await this.gastoRepository.buscarTodos(userId);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       throw new Error(`Erro ao buscar gastos: ${msg}`);
     }
   }
 
-  async buscarPorPeriodo(dataInicio: Date, dataFim: Date): Promise<Gasto[]> {
+  async buscarPorPeriodo(userId: string, dataInicio: Date, dataFim: Date): Promise<Gasto[]> {
     try {
-      const todos = await this.gastoRepository.buscarTodos();
+      const todos = await this.gastoRepository.buscarTodos(userId);
       return todos.filter((gasto) => {
         const dataGasto = gasto.dataHora;
         return dataGasto >= dataInicio && dataGasto <= dataFim;

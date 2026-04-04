@@ -1,6 +1,6 @@
 export interface IFormasPagamentoRepository {
-  salvar(forma: string): Promise<void>;
-  salvarTodas(formas: string[]): Promise<void>;
-  buscarTodas(): Promise<string[]>;
-  existe(forma: string): Promise<boolean>;
+  salvar(userId: string, nome: string): Promise<void>;
+  salvarTodas(userId: string, nomes: string[]): Promise<void>;
+  buscarTodas(userId: string): Promise<string[]>;
+  existe(userId: string, nome: string): Promise<boolean>;
 }

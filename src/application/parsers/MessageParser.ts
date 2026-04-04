@@ -29,7 +29,7 @@ export class MessageParser {
    * ou
    * dinheiro, 20, comida
    */
-  async parse(mensagem: string): Promise<Gasto> {
+  async parse(userId: string, mensagem: string): Promise<Gasto> {
     const partes = mensagem.split(',').map((p) => p.trim());
 
     if (partes.length < 3) {
@@ -45,22 +45,22 @@ export class MessageParser {
 
     try {
       // Validar forma de pagamento
-      const formasValidas = await this.gerenciarFormasPagamento.buscarTodas();
+      const formasValidas = await this.gerenciarFormasPagamento.buscarTodas(userId);
       const formaNormalizada = formaPagamentoStr.toLowerCase().trim();
       const formaValida = formasValidas.find((f) => f.toLowerCase() === formaNormalizada);
       if (!formaValida) {
         throw new Error(
-          `Forma de pagamento inválida: ${formaPagamentoStr}. Use /formas para ver as opções válidas`,
+          `Forma de pagamento invalida: ${formaPagamentoStr}. Use *formas* para ver as opcoes validas`,
         );
       }
 
       // Validar tipo de gasto
-      const tiposValidos = await this.gerenciarCategorias.buscarTodas();
+      const tiposValidos = await this.gerenciarCategorias.buscarTodas(userId);
       const tipoNormalizado = tipoStr.toLowerCase().trim();
       const tipoValido = tiposValidos.find((t) => t.toLowerCase() === tipoNormalizado);
       if (!tipoValido) {
         throw new Error(
-          `Tipo de gasto inválido: ${tipoStr}. Use /categorias para ver as opções válidas`,
+          `Tipo de gasto invalido: ${tipoStr}. Use *categorias* para ver as opcoes validas`,
         );
       }
 
@@ -84,9 +84,8 @@ export class MessageParser {
     return partes.length >= 3;
   }
 
-  async getMenuMessage(userId?: string): Promise<string> {
-    let configText = `/config - Configurar dados`;
-    let tituloTexto = '👋 Olá! Bem-vindo ao *Registro de Gastos*!';
+  async getMenuMessage(userId: string): Promise<string> {
+    let configText = `*config* - Configurar seu dia de início do mes`;
 
     if (userId) {
       try {
@@ -109,7 +108,6 @@ export class MessageParser {
               (diaInicioProxMes.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
             );
           }
-          tituloTexto = '👋 Bem vindo de volta!';
           configText = `\nSeu mês inicia em ${diasFaltantes} ${diasFaltantes === 1 ? 'dia' : 'dias'}`;
         }
       } catch (error) {
@@ -118,23 +116,22 @@ export class MessageParser {
     }
 
     return (
-      `${tituloTexto}\n\n` +
       `Você pode registrar gastos de duas formas:\n\n` +
       `1️⃣ *Mensagem direta:*\n` +
       `\`[tipo pagamento], [valor], [categoria], [observação]\`\n` +
       `\`Ex: cartão nubank, 35, moradia, aluguel\`\n\n` +
       `2️⃣ *Modo interativo:*\n` +
       `Digite *criar*\n\n` +
-      `📝 *Conheça o funcionamento:*\n` +
+      `📝 *Outras opções:*\n` +
       `*ajuda* - Ver ajuda completa e todas as funcionalidades\n` +
       `*relatorio* - Ver seus gastos do período\n` +
       `${configText}`
     );
   }
 
-  async getHelpMessage(userId?: string): Promise<string> {
-    const formas = await this.gerenciarFormasPagamento.buscarTodas();
-    const categorias = await this.gerenciarCategorias.buscarTodas();
+  async getHelpMessage(userId: string): Promise<string> {
+    const formas = await this.gerenciarFormasPagamento.buscarTodas(userId);
+    const categorias = await this.gerenciarCategorias.buscarTodas(userId);
 
     const formasFormatadas = formas.map((f) => `  • ${f}`).join('\n');
     const categoriasFormatadas = categorias.map((c) => `  • ${c}`).join('\n');
