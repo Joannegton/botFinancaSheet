@@ -1,10 +1,10 @@
 version: '3.9'
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stack: NestJS (bot financeiro) + PostgreSQL
-# WhatsApp via Twilio API (não requer serviço local)
-#
+# Stack: NestJS Backend + Next.js Frontend + PostgreSQL
 # Suba tudo com:  docker compose up -d
+# Backend:  http://localhost:3000/api/
+# Frontend: http://localhost:80 (ou :3000)
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -30,15 +30,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── NestJS (bot financeiro) ────────────────────────────────────────────────
-  app:
+  # ── NestJS Backend (API) ────────────────────────────────────────────────────
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: registro-gastos-bot
+    container_name: bot-backend-api
     restart: unless-stopped
     ports:
-      - '${PORT:-3000}:3000'
+      - '3000:3000'
     env_file:
       - .env
     environment:
@@ -48,6 +48,58 @@ services:
       - DB_USERNAME=${DB_USERNAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_NAME=${DB_NAME:-bot_financa}
+      - JWT_SECRET=${JWT_SECRET:-secure-secret-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Next.js Frontend ────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: bot-frontend-web
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # ── Nginx (Reverse Proxy + SSL) ────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: bot-nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
     volumes:
       - ./logs:/app/logs
     depends_on:
